@@ -21,7 +21,6 @@ jobs:
           base64 -d source/SviatFit_v1.3_Android_Project.b64 > source/SviatFit_v1.3_Android_Project.zip
           unzip -q source/SviatFit_v1.3_Android_Project.zip -d buildsrc
           base64 -d patch14/part01.txt > buildsrc/SviatFit/app/src/main/assets/index.html
-          sed -i '/<script>/a window.onerror=function(m,s,l,c,e){document.body.innerHTML="<pre style=\\\"color:#ff8080;background:#0c0f14;padding:24px;white-space:pre-wrap\\\">BOOT ERROR\\\\n"+String(m)+"\\\\nline "+l+":"+c+"</pre>";};' buildsrc/SviatFit/app/src/main/assets/index.html
           sed -i 's/versionCode 4/versionCode 6/' buildsrc/SviatFit/app/build.gradle
           sed -i 's/versionName "1.3.0"/versionName "1.4.2"/' buildsrc/SviatFit/app/build.gradle
 
@@ -68,28 +67,41 @@ jobs:
           disable-animations: true
           script: |
             set -eu
-            adb install -r "$GITHUB_WORKSPACE/buildsrc/SviatFit/app/build/outputs/apk/debug/app-debug.apk"
+            APK="$GITHUB_WORKSPACE/buildsrc/SviatFit/app/build/outputs/apk/debug/app-debug.apk"
+            adb install -r "$APK"
             adb shell pm grant com.sviat.fit android.permission.POST_NOTIFICATIONS || true
-            adb shell settings put global hide_error_dialogs 1 || true
             adb logcat -c
             adb shell am force-stop com.sviat.fit
             adb shell am start -W -n com.sviat.fit/.MainActivity | tee /tmp/am-start.txt
+
             sleep 5
+            adb exec-out screencap -p > /tmp/sviatfit-5s.png
+
+            sleep 10
+            adb exec-out screencap -p > /tmp/sviatfit-15s.png
+
+            sleep 15
+            adb exec-out screencap -p > /tmp/sviatfit-30s.png
+
             adb shell pidof com.sviat.fit | tee /tmp/pid.txt || true
-            adb shell dumpsys activity activities | grep -A 4 -B 2 'com.sviat.fit' | tee /tmp/activity.txt || true
-            adb logcat -d -v threadtime | grep -E 'AndroidRuntime|FATAL EXCEPTION|com.sviat.fit|chromium|WebView' | tail -400 | tee /tmp/logcat.txt || true
-            adb exec-out screencap -p > /tmp/sviatfit-runtime.png
+            adb shell dumpsys activity activities | grep -A 5 -B 2 'com.sviat.fit' | tee /tmp/activity.txt || true
+            adb shell uiautomator dump /sdcard/window.xml || true
+            adb pull /sdcard/window.xml /tmp/window.xml || true
+            adb logcat -d -v threadtime | grep -E 'AndroidRuntime|FATAL EXCEPTION|com.sviat.fit|chromium|WebView|Console' | tail -800 | tee /tmp/logcat.txt || true
             adb shell pidof com.sviat.fit >/dev/null
 
       - name: Upload diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: SviatFit-runtime-diagnostics
+          name: SviatFit-runtime-diagnostics-30s
           path: |
             /tmp/am-start.txt
             /tmp/pid.txt
             /tmp/activity.txt
             /tmp/logcat.txt
-            /tmp/sviatfit-runtime.png
+            /tmp/window.xml
+            /tmp/sviatfit-5s.png
+            /tmp/sviatfit-15s.png
+            /tmp/sviatfit-30s.png
           if-no-files-found: warn
