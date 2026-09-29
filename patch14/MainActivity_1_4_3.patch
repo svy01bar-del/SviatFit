@@ -1,0 +1,156 @@
+--- a/app/src/main/java/com/sviat/fit/MainActivity.java
++++ b/app/src/main/java/com/sviat/fit/MainActivity.java
+@@ -14,6 +14,13 @@
+ import android.content.pm.PackageManager;
+ import android.database.Cursor;
+ import android.graphics.Color;
++import android.graphics.Typeface;
++import android.view.Gravity;
++import android.view.View;
++import android.widget.FrameLayout;
++import android.widget.LinearLayout;
++import android.widget.ProgressBar;
++import android.widget.TextView;
+ import android.media.AudioAttributes;
+ import android.media.Ringtone;
+ import android.media.RingtoneManager;
+@@ -49,6 +56,8 @@
+     private static final String PREF_SOUND_NAME = "timer_sound_name";
+ 
+     private WebView webView;
++    private View loadingView;
++    private TextView loadingText;
+     private ValueCallback<Uri[]> filePathCallback;
+     private NotificationManager notificationManager;
+     private CountDownTimer nativeRestTimer;
+@@ -66,10 +75,57 @@
+ 
+         notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+         createTimerChannel();
+-        requestNotificationPermissionIfNeeded();
++
++        FrameLayout root = new FrameLayout(this);
++        root.setBackgroundColor(Color.rgb(12, 15, 20));
+ 
+         webView = new WebView(this);
+-        setContentView(webView);
++        webView.setVisibility(View.INVISIBLE);
++        root.addView(webView, new FrameLayout.LayoutParams(
++                FrameLayout.LayoutParams.MATCH_PARENT,
++                FrameLayout.LayoutParams.MATCH_PARENT
++        ));
++
++        LinearLayout splash = new LinearLayout(this);
++        splash.setOrientation(LinearLayout.VERTICAL);
++        splash.setGravity(Gravity.CENTER);
++        splash.setPadding(48, 48, 48, 48);
++        splash.setBackgroundColor(Color.rgb(12, 15, 20));
++
++        TextView title = new TextView(this);
++        title.setText("SviatFit");
++        title.setTextColor(Color.rgb(244, 247, 251));
++        title.setTextSize(30);
++        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
++        title.setGravity(Gravity.CENTER);
++        splash.addView(title, new LinearLayout.LayoutParams(
++                LinearLayout.LayoutParams.WRAP_CONTENT,
++                LinearLayout.LayoutParams.WRAP_CONTENT
++        ));
++
++        ProgressBar progress = new ProgressBar(this);
++        LinearLayout.LayoutParams progressLp = new LinearLayout.LayoutParams(72, 72);
++        progressLp.topMargin = 28;
++        splash.addView(progress, progressLp);
++
++        loadingText = new TextView(this);
++        loadingText.setText("Завантаження тренування…");
++        loadingText.setTextColor(Color.rgb(143, 152, 168));
++        loadingText.setTextSize(15);
++        loadingText.setGravity(Gravity.CENTER);
++        LinearLayout.LayoutParams textLp = new LinearLayout.LayoutParams(
++                LinearLayout.LayoutParams.WRAP_CONTENT,
++                LinearLayout.LayoutParams.WRAP_CONTENT
++        );
++        textLp.topMargin = 18;
++        splash.addView(loadingText, textLp);
++
++        loadingView = splash;
++        root.addView(splash, new FrameLayout.LayoutParams(
++                FrameLayout.LayoutParams.MATCH_PARENT,
++                FrameLayout.LayoutParams.MATCH_PARENT
++        ));
++        setContentView(root);
+ 
+         WebSettings s = webView.getSettings();
+         s.setJavaScriptEnabled(true);
+@@ -82,7 +138,14 @@
+         s.setTextZoom(100);
+ 
+         webView.setBackgroundColor(Color.rgb(12, 15, 20));
+-        webView.setWebViewClient(new WebViewClient());
++        webView.setWebViewClient(new WebViewClient() {
++            @Override
++            public void onPageFinished(WebView view, String url) {
++                super.onPageFinished(view, url);
++                webView.setVisibility(View.VISIBLE);
++                if (loadingView != null) loadingView.setVisibility(View.GONE);
++            }
++        });
+         webView.addJavascriptInterface(new NativeBridge(this), "Android");
+ 
+         webView.setWebChromeClient(new WebChromeClient() {
+@@ -105,6 +168,17 @@
+         });
+ 
+         webView.loadUrl("file:///android_asset/index.html");
++
++        handler.postDelayed(() -> {
++            if (loadingView != null && loadingView.getVisibility() == View.VISIBLE && loadingText != null) {
++                loadingText.setText("Android WebView запускається. Ще кілька секунд…");
++            }
++        }, 6000L);
++        handler.postDelayed(() -> {
++            if (loadingView != null && loadingView.getVisibility() == View.VISIBLE && loadingText != null) {
++                loadingText.setText("Запуск триває довше звичайного. Не закривай програму.");
++            }
++        }, 12000L);
+     }
+ 
+     private void createTimerChannel() {
+@@ -132,6 +206,14 @@
+         return Build.VERSION.SDK_INT < 33 || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
+     }
+ 
++    @Override
++    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
++        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
++        if (requestCode == NOTIFICATION_PERMISSION_REQUEST && canPostNotifications()) {
++            if (nativeRestTimer == null && workoutStartWallMs > 0L) showWorkoutNotification();
++        }
++    }
++
+     private PendingIntent openAppIntent() {
+         Intent intent = new Intent(this, MainActivity.class);
+         intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+@@ -371,7 +453,8 @@
+             runOnUiThread(() -> {
+                 workoutName = (title == null || title.trim().isEmpty()) ? "SviatFit" : title;
+                 workoutStartWallMs = startWallMs > 0 ? startWallMs : System.currentTimeMillis();
+-                if (nativeRestTimer == null) showWorkoutNotification();
++                requestNotificationPermissionIfNeeded();
++                if (nativeRestTimer == null && canPostNotifications()) showWorkoutNotification();
+             });
+         }
+ 
+@@ -394,7 +477,10 @@
+ 
+         @JavascriptInterface
+         public void startRestTimer(int seconds, boolean soundEnabled, boolean vibrationEnabled) {
+-            runOnUiThread(() -> startNativeRestTimer(seconds, soundEnabled, vibrationEnabled));
++            runOnUiThread(() -> {
++                requestNotificationPermissionIfNeeded();
++                startNativeRestTimer(seconds, soundEnabled, vibrationEnabled);
++            });
+         }
+ 
+         @JavascriptInterface
