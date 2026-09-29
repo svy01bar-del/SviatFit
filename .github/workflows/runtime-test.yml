@@ -75,6 +75,7 @@ jobs:
             set -eu
             adb install -r "$GITHUB_WORKSPACE/buildsrc/SviatFit/app/build/outputs/apk/debug/app-debug.apk"
             adb shell pm grant com.sviat.fit android.permission.POST_NOTIFICATIONS || true
+            adb shell settings put global hide_error_dialogs 1 || true
             adb logcat -c
             adb shell am force-stop com.sviat.fit
             adb shell am start -W -n com.sviat.fit/.MainActivity | tee /tmp/am-start.txt
