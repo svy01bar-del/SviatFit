@@ -68,6 +68,7 @@ jobs:
           script: |
             set -eu
             adb install -r "$GITHUB_WORKSPACE/buildsrc/SviatFit/app/build/outputs/apk/debug/app-debug.apk"
+            adb shell pm grant com.sviat.fit android.permission.POST_NOTIFICATIONS || true
             adb logcat -c
             adb shell am force-stop com.sviat.fit
             adb shell am start -W -n com.sviat.fit/.MainActivity | tee /tmp/am-start.txt
@@ -76,10 +77,7 @@ jobs:
             adb shell dumpsys activity activities | grep -A 4 -B 2 'com.sviat.fit' | tee /tmp/activity.txt || true
             adb logcat -d -v threadtime | grep -E 'AndroidRuntime|FATAL EXCEPTION|com.sviat.fit|chromium|WebView' | tail -400 | tee /tmp/logcat.txt || true
             adb exec-out screencap -p > /tmp/sviatfit-runtime.png
-            if ! adb shell pidof com.sviat.fit >/dev/null; then
-              echo "APP_NOT_RUNNING"
-              exit 1
-            fi
+            adb shell pidof com.sviat.fit >/dev/null
 
       - name: Upload diagnostics
         if: always()
