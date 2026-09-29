@@ -66,7 +66,7 @@ jobs:
           profile: pixel_7
           disable-animations: true
           script: |
-            set -euxo pipefail
+            set -eu
             APK="$GITHUB_WORKSPACE/buildsrc/SviatFit/app/build/outputs/apk/debug/app-debug.apk"
             adb install -r "$APK"
             adb logcat -c
