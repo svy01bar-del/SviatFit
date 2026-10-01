@@ -110,11 +110,11 @@ method = r"""    private boolean isDebuggableBuild() {
 
         if ("full_flow".equals(action)) {
             view.evaluateJavascript(
-                    "(function(){var b=document.querySelector('.template-start');if(!b)return 'NO_START';var r=b.getBoundingClientRect();var o={text:b.innerText,w:Math.round(r.width),h:Math.round(r.height)};b.click();return JSON.stringify(o);})()",
+                    "(function(){var b=document.querySelector('.template-start');if(!b)return 'NO_START';var r=b.getBoundingClientRect();var out='w='+Math.round(r.width)+',h='+Math.round(r.height)+',text='+b.innerText;b.click();return out;})()",
                     value -> {
                         Log.i("SviatQA", "HOME_START=" + value);
                         view.postDelayed(() -> view.evaluateJavascript(
-                                "(function(){var f=document.getElementById('finishExerciseAction');var n=document.querySelector('.exercise-item.current .exercise-titleline');if(!f)return 'NO_FINISH';var r=f.getBoundingClientRect();return JSON.stringify({exercise:n?n.innerText:'',finish:f.innerText,w:Math.round(r.width),h:Math.round(r.height)});})()",
+                                "(function(){var f=document.getElementById('finishExerciseAction');var n=document.querySelector('.exercise-item.current .exercise-titleline');if(!f)return 'NO_FINISH';var r=f.getBoundingClientRect();return 'w='+Math.round(r.width)+',h='+Math.round(r.height)+',exercise='+(n?n.innerText:'')+',finish='+f.innerText;})()",
                                 workout -> {
                                     Log.i("SviatQA", "WORKOUT=" + workout);
                                     view.evaluateJavascript(
@@ -122,7 +122,7 @@ method = r"""    private boolean isDebuggableBuild() {
                                             clicked -> {
                                                 Log.i("SviatQA", "FINISH_CLICK=" + clicked);
                                                 view.postDelayed(() -> view.evaluateJavascript(
-                                                        "(function(){var f=document.getElementById('finishExerciseAction');var n=document.querySelector('.exercise-item.current .exercise-titleline');var done=document.querySelectorAll('.exercise-item.done').length;return JSON.stringify({exercise:n?n.innerText:'',finish:f?f.innerText:'',done:done});})()",
+                                                        "(function(){var f=document.getElementById('finishExerciseAction');var n=document.querySelector('.exercise-item.current .exercise-titleline');var done=document.querySelectorAll('.exercise-item.done').length;return 'done='+done+',exercise='+(n?n.innerText:'')+',finish='+(f?f.innerText:'');})()",
                                                         done -> Log.i("SviatQA", "FLOW_DONE=" + done)
                                                 ), 500L);
                                             }
