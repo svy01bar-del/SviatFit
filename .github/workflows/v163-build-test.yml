@@ -97,10 +97,8 @@ jobs:
           disable-animations: true
           script: |
             set -eu
-            APK="$GITHUB_WORKSPACE/v163/buildsrc/SviatFit-v1.6.0/app/build/outputs/apk/debug/app-debug.apk"
-
             adb devices
-            adb install -r "$APK"
+            adb install -r "$GITHUB_WORKSPACE/v163/buildsrc/SviatFit-v1.6.0/app/build/outputs/apk/debug/app-debug.apk"
             adb shell cmd package resolve-activity --brief com.sviat.fit | tee /tmp/resolved-activity.txt
             grep -q 'com.sviat.fit/.MainActivity' /tmp/resolved-activity.txt
 
