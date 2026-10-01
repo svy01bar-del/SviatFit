@@ -24,6 +24,7 @@ jobs:
           cd v161/buildsrc/SviatFit-v1.6.0
           sed -i 's/\r$//' app/src/main/assets/index.html
           patch -p1 < "$GITHUB_WORKSPACE/patch161/workout-ui.patch"
+          patch -p1 < "$GITHUB_WORKSPACE/patch161/safe-area.patch"
           sed -i -E 's/versionCode [0-9]+/versionCode 10/' app/build.gradle
           sed -i 's/versionName "1.6.0"/versionName "1.6.1"/' app/build.gradle
           grep -q 'versionName "1.6.1"' app/build.gradle
