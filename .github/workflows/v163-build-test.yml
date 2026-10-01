@@ -1,0 +1,182 @@
+name: Build and test SviatFit 1.6.3
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'patch163/**'
+      - '.github/workflows/v163-build-test.yml'
+
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Reconstruct and patch source
+        run: |
+          mkdir -p v163/buildsrc
+          cat v160/source2/part*.txt > v163/SviatFit_v1.6.0_Android_Project.b64
+          base64 -d v163/SviatFit_v1.6.0_Android_Project.b64 > v163/SviatFit_v1.6.0_Android_Project.zip
+          unzip -q v163/SviatFit_v1.6.0_Android_Project.zip -d v163/buildsrc
+          cd v163/buildsrc/SviatFit-v1.6.0
+          sed -i 's/\r$//' app/src/main/assets/index.html
+
+          patch -p1 < "$GITHUB_WORKSPACE/patch161/workout-ui.patch"
+          sed -i 's/margin:0 -12px 8px;padding:12px 14px 10px;/margin:0 -12px 8px;padding:calc(34px + env(safe-area-inset-top)) 14px 10px;/' app/src/main/assets/index.html
+          sed -i 's/max-width:720px;margin:auto;padding:8px 12px calc(8px + env(safe-area-inset-bottom));/max-width:720px;margin:auto;padding:8px 12px calc(20px + env(safe-area-inset-bottom));/' app/src/main/assets/index.html
+          sed -i 's/bottom:calc(76px + env(safe-area-inset-bottom));/bottom:calc(88px + env(safe-area-inset-bottom));/' app/src/main/assets/index.html
+
+          python3 "$GITHUB_WORKSPACE/patch162/apply_home_ui.py"
+          python3 "$GITHUB_WORKSPACE/patch163/apply_v163.py"
+          python3 "$GITHUB_WORKSPACE/patch163/apply_native_startup_qa.py"
+
+          sed -i -E 's/versionCode [0-9]+/versionCode 12/' app/build.gradle
+          sed -i 's/versionName "1.6.0"/versionName "1.6.3"/' app/build.gradle
+
+          grep -q 'versionName "1.6.3"' app/build.gradle
+          grep -q '<title>SviatFit 1.6.3</title>' app/src/main/assets/index.html
+          grep -q '▶ Почати тренування' app/src/main/assets/index.html
+          grep -q 'finishExerciseAction' app/src/main/assets/index.html
+          grep -q 'runQaAction' app/src/main/java/com/sviat/fit/MainActivity.java
+          grep -q 'Завантаження тренувань' app/src/main/java/com/sviat/fit/MainActivity.java
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Install Android SDK 35
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+        run: |
+          SDKMANAGER="$(find "$ANDROID_HOME" -type f -name sdkmanager 2>/dev/null | head -n 1)"
+          test -n "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+
+      - name: Build APK
+        working-directory: v163/buildsrc/SviatFit-v1.6.0
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+        run: gradle assembleDebug --console=plain
+
+      - name: Verify APK archive
+        run: |
+          APK="v163/buildsrc/SviatFit-v1.6.0/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          unzip -t "$APK" >/dev/null
+          unzip -p "$APK" assets/index.html | grep -q '<title>SviatFit 1.6.3</title>'
+          unzip -p "$APK" assets/index.html | grep -q 'finishExerciseAction'
+          cp "$APK" /tmp/SviatFit_v1.6.3_working.apk
+          sha256sum "$APK" | tee /tmp/apk-sha256.txt
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Android 15 emulator QA
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7
+          disable-animations: true
+          script: |
+            set -eu
+            APK="$GITHUB_WORKSPACE/v163/buildsrc/SviatFit-v1.6.0/app/build/outputs/apk/debug/app-debug.apk"
+
+            adb devices
+            adb install -r "$APK"
+            adb shell cmd package resolve-activity --brief com.sviat.fit | tee /tmp/resolved-activity.txt
+            grep -q 'com.sviat.fit/.MainActivity' /tmp/resolved-activity.txt
+
+            adb shell pm grant com.sviat.fit android.permission.POST_NOTIFICATIONS || true
+            adb shell settings put global hide_error_dialogs 1 || true
+            adb logcat -c
+            adb shell am force-stop com.sviat.fit
+            adb shell am start -W -n com.sviat.fit/.MainActivity --es sviat_qa_action full_flow | tee /tmp/am-start.txt
+
+            # UI-tree capture is kept as part of the QA evidence. WebView content is
+            # exercised through the debug-only in-app QA hook, so no guessed tap
+            # coordinates are used.
+            timeout 20s adb exec-out uiautomator dump /dev/tty > /tmp/ui-launch.xml || true
+
+            FOUND=0
+            for i in $(seq 1 30); do
+              adb logcat -d -v brief > /tmp/logcat-current.txt
+              if grep -q 'SviatQA.*FLOW_DONE=' /tmp/logcat-current.txt; then
+                FOUND=1
+                break
+              fi
+              sleep 1
+            done
+            test "$FOUND" = "1"
+
+            adb exec-out screencap -p > /tmp/sviatfit-flow.png
+            adb shell pidof com.sviat.fit | tee /tmp/pid.txt
+            test -s /tmp/pid.txt
+            adb shell dumpsys activity activities | grep -q 'com.sviat.fit/.MainActivity'
+
+            adb logcat -d -v threadtime > /tmp/logcat-full.txt
+            grep 'SviatQA' /tmp/logcat-full.txt | tee /tmp/qa-flow.txt
+            grep -q 'HOME_START=' /tmp/qa-flow.txt
+            grep -q 'WORKOUT=' /tmp/qa-flow.txt
+            grep -q 'FINISH_CLICK=' /tmp/qa-flow.txt
+            grep -q 'FLOW_DONE=' /tmp/qa-flow.txt
+
+            python3 - <<'PY'
+            import re, pathlib
+            t=pathlib.Path('/tmp/qa-flow.txt').read_text(errors='ignore')
+            home=re.search(r'HOME_START=.*?\\\"w\\\":(\\d+).*?\\\"h\\\":(\\d+)',t)
+            workout=re.search(r'WORKOUT=.*?\\\"w\\\":(\\d+).*?\\\"h\\\":(\\d+)',t)
+            if not home: raise SystemExit('Could not parse home start button metrics')
+            if not workout: raise SystemExit('Could not parse finish exercise button metrics')
+            hw,hh=map(int,home.groups())
+            fw,fh=map(int,workout.groups())
+            print('home_start_px',hw,hh)
+            print('finish_exercise_px',fw,fh)
+            assert hw >= 300 and hh >= 44, (hw,hh)
+            assert fw >= 300 and fh >= 44, (fw,fh)
+            assert 'FLOW_DONE=' in t
+            PY
+
+            ! grep -q 'FATAL EXCEPTION' /tmp/logcat-full.txt
+            test "$(stat -c%s /tmp/sviatfit-flow.png)" -gt 20000
+
+      - name: Upload working APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SviatFit-v1.6.3-working-APK
+          path: /tmp/SviatFit_v1.6.3_working.apk
+          if-no-files-found: error
+
+      - name: Upload QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SviatFit-v1.6.3-Android-QA
+          path: |
+            /tmp/resolved-activity.txt
+            /tmp/am-start.txt
+            /tmp/ui-launch.xml
+            /tmp/sviatfit-flow.png
+            /tmp/pid.txt
+            /tmp/qa-flow.txt
+            /tmp/logcat-full.txt
+            /tmp/apk-sha256.txt
+          if-no-files-found: warn
