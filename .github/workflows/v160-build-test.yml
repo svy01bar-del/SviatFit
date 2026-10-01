@@ -91,10 +91,8 @@ jobs:
             adb exec-out screencap -p > /tmp/sviatfit-8s.png
             adb shell pidof com.sviat.fit | tee /tmp/pid.txt
             adb logcat -d -v threadtime | grep -E 'AndroidRuntime|FATAL EXCEPTION|com.sviat.fit|chromium|WebView' | tail -1000 | tee /tmp/logcat.txt || true
-            if grep -q 'FATAL EXCEPTION' /tmp/logcat.txt; then
-              echo "SviatFit crashed"
-              exit 1
-            fi
+            ! grep -q 'FATAL EXCEPTION' /tmp/logcat.txt
+            adb shell dumpsys activity activities | grep -q 'com.sviat.fit/.MainActivity'
 
       - name: Upload working APK
         if: success()
