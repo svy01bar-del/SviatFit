@@ -85,8 +85,7 @@ jobs:
           disable-animations: true
           script: |
             set -eu
-            APK="$GITHUB_WORKSPACE/v161/buildsrc/SviatFit-v1.6.0/app/build/outputs/apk/debug/app-debug.apk"
-            adb install -r "$APK"
+            adb install -r "$GITHUB_WORKSPACE/v161/buildsrc/SviatFit-v1.6.0/app/build/outputs/apk/debug/app-debug.apk"
             adb shell pm grant com.sviat.fit android.permission.POST_NOTIFICATIONS || true
             adb shell settings put global hide_error_dialogs 1 || true
             adb logcat -c
