@@ -24,7 +24,9 @@ jobs:
           cd v161/buildsrc/SviatFit-v1.6.0
           sed -i 's/\r$//' app/src/main/assets/index.html
           patch -p1 < "$GITHUB_WORKSPACE/patch161/workout-ui.patch"
-          patch -p1 < "$GITHUB_WORKSPACE/patch161/safe-area.patch"
+          sed -i 's/margin:0 -12px 8px;padding:12px 14px 10px;/margin:0 -12px 8px;padding:calc(34px + env(safe-area-inset-top)) 14px 10px;/' app/src/main/assets/index.html
+          sed -i 's/max-width:720px;margin:auto;padding:8px 12px calc(8px + env(safe-area-inset-bottom));/max-width:720px;margin:auto;padding:8px 12px calc(20px + env(safe-area-inset-bottom));/' app/src/main/assets/index.html
+          sed -i 's/bottom:calc(76px + env(safe-area-inset-bottom));/bottom:calc(88px + env(safe-area-inset-bottom));/' app/src/main/assets/index.html
           sed -i -E 's/versionCode [0-9]+/versionCode 10/' app/build.gradle
           sed -i 's/versionName "1.6.0"/versionName "1.6.1"/' app/build.gradle
           grep -q 'versionName "1.6.1"' app/build.gradle
