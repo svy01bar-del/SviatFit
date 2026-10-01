@@ -18,7 +18,7 @@ jobs:
       - name: Reconstruct source archive
         run: |
           mkdir -p v160/buildsrc
-          cat v160/source/part*.txt > v160/SviatFit_v1.6.0_Android_Project.b64
+          cat v160/source2/part*.txt > v160/SviatFit_v1.6.0_Android_Project.b64
           base64 -d v160/SviatFit_v1.6.0_Android_Project.b64 > v160/SviatFit_v1.6.0_Android_Project.zip
           unzip -q v160/SviatFit_v1.6.0_Android_Project.zip -d v160/buildsrc
           test -f v160/buildsrc/SviatFit-v1.6.0/app/build.gradle
