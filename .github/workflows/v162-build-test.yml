@@ -105,13 +105,24 @@ jobs:
 
             timeout 20s adb shell uiautomator dump /sdcard/home.xml >/dev/null || true
             adb pull /sdcard/home.xml /tmp/home.xml >/dev/null || true
-            adb exec-out screencap -p > /tmp/home-optimized.png
+
+            # Cold Android emulator WebView startup can take several seconds.
+            # Wait until the screenshot contains the rendered UI rather than the blank WebView surface.
+            for i in 1 2 3 4; do
+              adb exec-out screencap -p > /tmp/home-optimized.png
+              SIZE=$(stat -c%s /tmp/home-optimized.png)
+              echo "home screenshot bytes=$SIZE attempt=$i"
+              if [ "$SIZE" -gt 100000 ]; then break; fi
+              sleep 6
+            done
+            test "$(stat -c%s /tmp/home-optimized.png)" -gt 100000
 
             # The WebView on this Android image exposes only the WebView container to UIAutomator.
             # Tap the center of the first full-width start button on the Pixel 7 profile.
             adb shell input tap 540 1232
-            sleep 2
+            sleep 3
             adb exec-out screencap -p > /tmp/workout-after-start.png
+            test "$(stat -c%s /tmp/workout-after-start.png)" -gt 100000
             ! cmp -s /tmp/home-optimized.png /tmp/workout-after-start.png
 
             adb shell pidof com.sviat.fit | tee /tmp/pid.txt
