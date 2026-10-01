@@ -94,7 +94,7 @@ jobs:
             adb shell am start -W -n com.sviat.fit/.MainActivity | tee /tmp/am-start.txt
             sleep 4
 
-            adb shell uiautomator dump /sdcard/home.xml >/dev/null
+            timeout 20s adb shell uiautomator dump /sdcard/home.xml >/dev/null
             adb pull /sdcard/home.xml /tmp/home.xml >/dev/null
             python3 - <<'PY' > /tmp/start-tap.txt
             import re, xml.etree.ElementTree as ET
@@ -110,7 +110,7 @@ jobs:
             adb shell input tap "$X" "$Y"
             sleep 2
 
-            adb shell uiautomator dump /sdcard/workout.xml >/dev/null
+            timeout 20s adb shell uiautomator dump /sdcard/workout.xml >/dev/null
             adb pull /sdcard/workout.xml /tmp/workout.xml >/dev/null
             python3 - <<'PY' > /tmp/exercise-tap.txt
             import re, xml.etree.ElementTree as ET
@@ -126,7 +126,7 @@ jobs:
             adb shell input tap "$X" "$Y"
             sleep 2
 
-            adb shell uiautomator dump /sdcard/bench.xml >/dev/null
+            timeout 20s adb shell uiautomator dump /sdcard/bench.xml >/dev/null
             adb pull /sdcard/bench.xml /tmp/bench.xml >/dev/null
             grep -q 'Жим штанги лежачи' /tmp/bench.xml
             grep -q 'Далі' /tmp/bench.xml
