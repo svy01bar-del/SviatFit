@@ -1,0 +1,92 @@
+from pathlib import Path
+
+p = Path("app/src/main/assets/index.html")
+s = p.read_text(encoding="utf-8")
+
+s = s.replace("<title>SviatFit 1.6.1</title>", "<title>SviatFit 1.6.2</title>", 1)
+s = s.replace(
+    'SviatFit <span style="font-size:13px;color:var(--muted);font-weight:700">1.6.1</span>',
+    'SviatFit <span style="font-size:13px;color:var(--muted);font-weight:700">1.6.2</span>',
+    1,
+)
+s = s.replace('<div class="card"><b>SviatFit 1.6.1</b>', '<div class="card"><b>SviatFit 1.6.2</b>', 1)
+
+css = r"""
+/* SviatFit 1.6.2 — phone-first home cards */
+.home-days-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:14px 0 8px}
+.home-days-head h3{margin:0}
+.home-tools{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.home-tools .btn{min-height:46px;padding:10px 12px}
+#templates{grid-template-columns:1fr;gap:12px}
+.template{
+ min-height:0;padding:14px;border-radius:17px;
+ background:#171e29;border-color:#2b3544
+}
+.template-head{display:grid;grid-template-columns:46px minmax(0,1fr);gap:11px;align-items:start}
+.template .letter{
+ width:46px;height:46px;display:grid;place-items:center;
+ font-size:26px;font-weight:900;line-height:1;border-radius:14px;
+ background:#202b3b;color:#f4f7fb;border:1px solid #334259
+}
+.template-title{font-size:17px;line-height:1.2;font-weight:850;margin-top:1px}
+.template-count{font-size:12px;color:var(--muted);margin-top:3px}
+.template .tpl-mini{
+ margin:8px 0 0;font-size:12px;line-height:1.4;max-height:36px;
+ display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden
+}
+.template-start{
+ width:100%;min-height:52px;margin-top:13px;border-radius:14px;
+ font-size:16px;letter-spacing:.1px
+}
+.template-actions{
+ display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+ gap:8px;margin-top:8px
+}
+.template-tool{
+ min-width:0;min-height:48px;padding:7px 6px!important;border-radius:13px!important;
+ display:flex;align-items:center;justify-content:center;gap:6px
+}
+.template-tool .tool-ico{font-size:18px;line-height:1}
+.template-tool .tool-label{font-size:11px;font-weight:800;white-space:nowrap}
+@media(min-width:600px){
+ #templates{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:430px){
+ .home-days-head{display:block}
+ .home-tools{margin-top:9px}
+ .home-tools .btn{width:100%}
+ .template-tool .tool-label{font-size:10px}
+}
+"""
+
+if "/* SviatFit 1.6.2 — phone-first home cards */" not in s:
+    s = s.replace("</style>", css + "\n</style>", 1)
+
+old = """<div class="row between wrap"><h3>Мої дні</h3><div class="row"><button class="btn secondary" id="libraryBtn">Бібліотека</button><button class="btn secondary" id="newTemplate">+ Створити</button></div></div>
+ <div class="grid" id="templates">${state.templates.map(t=>`
+  <div class="card template">
+   <div><div class="letter">${esc(t.color||'•')}</div><b>${esc(t.name)}</b><div class="muted small">${t.exercises.length} вправ</div><div class="tpl-mini">${t.exercises.length?t.exercises.map((e,i)=>`${i+1}. ${esc(e.name)}`).join(' · '):'Список порожній'}</div></div>
+    <div class="row"><button class="btn grow start" data-id="${t.id}">Почати</button><button class="btn secondary tplList" data-id="${t.id}">☰</button><button class="btn secondary shareTpl" data-id="${t.id}" aria-label="Поділитися планом">↗</button><button class="btn secondary edit" data-id="${t.id}">✎</button></div>
+  </div>`).join('')}</div>"""
+
+new = """<div class="home-days-head"><h3>Мої дні</h3><div class="home-tools"><button class="btn secondary" id="libraryBtn">Бібліотека</button><button class="btn secondary" id="newTemplate">+ Створити</button></div></div>
+ <div class="grid" id="templates">${state.templates.map(t=>`
+  <div class="card template">
+   <div class="template-head">
+    <div class="letter">${esc(t.color||'•')}</div>
+    <div><div class="template-title">${esc(t.name)}</div><div class="template-count">${t.exercises.length} вправ</div><div class="tpl-mini">${t.exercises.length?t.exercises.map((e,i)=>`${i+1}. ${esc(e.name)}`).join(' · '):'Список порожній'}</div></div>
+   </div>
+   <button class="btn template-start start" data-id="${t.id}">▶ Почати тренування</button>
+   <div class="template-actions">
+    <button class="btn secondary template-tool tplList" data-id="${t.id}" aria-label="Список вправ"><span class="tool-ico">☰</span><span class="tool-label">Список</span></button>
+    <button class="btn secondary template-tool shareTpl" data-id="${t.id}" aria-label="Поділитися планом"><span class="tool-ico">↗</span><span class="tool-label">Поділ.</span></button>
+    <button class="btn secondary template-tool edit" data-id="${t.id}" aria-label="Редагувати день"><span class="tool-ico">✎</span><span class="tool-label">Змінити</span></button>
+   </div>
+  </div>`).join('')}</div>"""
+
+if old not in s:
+    raise SystemExit("Expected 1.6.1 home card markup was not found")
+s = s.replace(old, new, 1)
+
+p.write_text(s, encoding="utf-8")
+print("Applied SviatFit 1.6.2 home UI transform")
