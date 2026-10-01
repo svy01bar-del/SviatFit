@@ -95,32 +95,14 @@ jobs:
 
             timeout 20s adb shell uiautomator dump /sdcard/home.xml >/dev/null
             adb pull /sdcard/home.xml /tmp/home.xml >/dev/null
-            python3 - <<'PY' > /tmp/start-tap.txt
-            import re, xml.etree.ElementTree as ET
-            root=ET.parse('/tmp/home.xml').getroot()
-            nodes=[n for n in root.iter('node') if n.attrib.get('text')=='Почати']
-            if not nodes:
-                raise SystemExit('No Почати node in UI tree')
-            b=nodes[0].attrib['bounds']
-            x1,y1,x2,y2=map(int,re.findall(r'\d+',b))
-            print((x1+x2)//2,(y1+y2)//2)
-            PY
+            python3 -c "import re,xml.etree.ElementTree as ET; root=ET.parse('/tmp/home.xml').getroot(); n=next((x for x in root.iter('node') if x.attrib.get('text')=='Почати'),None); assert n is not None,'No Почати node'; a=list(map(int,re.findall(r'\\d+',n.attrib['bounds']))); print((a[0]+a[2])//2,(a[1]+a[3])//2)" > /tmp/start-tap.txt
             read X Y < /tmp/start-tap.txt
             adb shell input tap "$X" "$Y"
             sleep 2
 
             timeout 20s adb shell uiautomator dump /sdcard/workout.xml >/dev/null
             adb pull /sdcard/workout.xml /tmp/workout.xml >/dev/null
-            python3 - <<'PY' > /tmp/exercise-tap.txt
-            import re, xml.etree.ElementTree as ET
-            root=ET.parse('/tmp/workout.xml').getroot()
-            nodes=[n for n in root.iter('node') if n.attrib.get('text')=='Жим штанги лежачи']
-            if not nodes:
-                raise SystemExit('No bench press node in workout UI tree')
-            b=nodes[0].attrib['bounds']
-            x1,y1,x2,y2=map(int,re.findall(r'\d+',b))
-            print((x1+x2)//2,(y1+y2)//2)
-            PY
+            python3 -c "import re,xml.etree.ElementTree as ET; root=ET.parse('/tmp/workout.xml').getroot(); n=next((x for x in root.iter('node') if x.attrib.get('text')=='Жим штанги лежачи'),None); assert n is not None,'No bench press node'; a=list(map(int,re.findall(r'\\d+',n.attrib['bounds']))); print((a[0]+a[2])//2,(a[1]+a[3])//2)" > /tmp/exercise-tap.txt
             read X Y < /tmp/exercise-tap.txt
             adb shell input tap "$X" "$Y"
             sleep 2
