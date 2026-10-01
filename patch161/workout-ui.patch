@@ -1,0 +1,196 @@
+--- a/app/src/main/assets/index.html
++++ b/app/src/main/assets/index.html
+@@ -4,7 +4,7 @@
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+ <meta name="theme-color" content="#0c0f14">
+-<title>SviatFit 1.6.0</title>
++<title>SviatFit 1.6.1</title>
+ <style>
+ :root{
+   --bg:#0c0f14;--panel:#141922;--card:#191f2a;--muted:#8f98a8;--text:#f4f7fb;
+@@ -113,7 +113,7 @@
+ @media(max-width:430px){.brand h1{font-size:22px}.badge{font-size:11px}.screen{padding-left:12px;padding-right:12px}.btn{padding-left:12px;padding-right:12px}}
+ 
+ 
+-/* SviatFit 1.6.0: compact vertical exercise list and inline active exercise */
++/* SviatFit 1.6.1: compact vertical exercise list and inline active exercise */
+ body.workout-mode{padding-bottom:22px}
+ body.workout-mode.rest-active{padding-bottom:102px}
+ body.workout-mode .top{padding-top:calc(11px + env(safe-area-inset-top));padding-bottom:4px}
+@@ -169,12 +169,103 @@
+ }
+ @media(max-width:350px){.exercise-expanded .sethead,.exercise-expanded .setrow{grid-template-columns:23px minmax(0,1fr) minmax(0,1fr) 38px 36px;gap:3px}.exercise-expanded .stepper{grid-template-columns:26px minmax(0,1fr) 26px}.exercise-expanded .stepper button{font-size:17px}}
+ 
++
++/* SviatFit 1.6.1 — workout screen optimized with Mobile App Builder guidance */
++body.workout-mode{padding-bottom:94px}
++body.workout-mode.rest-active{padding-bottom:174px}
++body.workout-mode .top{display:none}
++body.workout-mode .screen{padding:0 12px 24px}
++
++.workout-overview{
++ position:sticky;top:0;z-index:18;
++ margin:0 -12px 8px;padding:12px 14px 10px;
++ border:0;border-bottom:1px solid #202a38;border-radius:0;
++ background:rgba(12,15,20,.96);backdrop-filter:blur(16px);
++}
++.workout-overview h2{font-size:21px;line-height:1.12;margin:2px 0 0;letter-spacing:-.35px}
++.workout-topline{align-items:center}
++.workout-head-actions{gap:6px}
++.finish-btn{min-height:40px!important;padding:8px 12px!important;border-color:#61313a!important;background:#2b171d!important;color:#ffb2ba!important}
++.icon-btn{width:42px;height:42px;border:1px solid #2b3544;border-radius:13px;background:#121821;color:#aab4c3;font-size:20px}
++.workout-quickstats{display:flex;align-items:center;gap:8px;margin-top:10px}
++.workout-quickstats span{display:flex;align-items:baseline;gap:4px;padding:6px 9px;border:1px solid #253042;border-radius:999px;background:#111720}
++.workout-quickstats b{font-size:14px}
++.workout-quickstats small{font-size:10px;color:var(--muted)}
++.workout-overview .progressbar{height:5px;margin-top:9px}
++
++.workout-list{padding:0;margin:0;background:transparent;border:0}
++.workout-list-head{padding:7px 2px 8px}
++.workout-list-head b{font-size:15px}
++.exercise-list{gap:8px;margin-top:0}
++.exercise-item{border-radius:16px;background:#121821;border-color:#283244}
++.exercise-item.current{border-color:#6f92ff;background:#141d2c;box-shadow:0 0 0 1px rgba(124,156,255,.14) inset}
++.exercise-item.done{opacity:1;background:#101c18;border-color:#244438}
++.exercise-summary{min-height:58px;grid-template-columns:32px minmax(0,1fr) auto;padding:10px 12px;gap:9px}
++.exercise-symbol{width:30px;height:30px;display:grid;place-items:center;border-radius:50%;font-size:16px;background:#202838;border:1px solid #334056}
++.exercise-item.done .exercise-symbol{background:#173329;border-color:#2f6a53;color:#7ee0af}
++.exercise-item.current:not(.done) .exercise-symbol{background:#24365f;border-color:#567ee2;color:#dce6ff}
++.exercise-titleline{font-size:15px;line-height:1.25}
++.exercise-meta{font-size:12px}
++.exercise-arrow{color:#7f8a9c}
++.exercise-expanded{padding:0 12px 12px;border-top-color:#2a3548}
++.exercise-tools{justify-content:flex-start;padding-top:10px}
++.exercise-tools .btn{min-height:40px;padding:8px 11px;font-size:12px;border-radius:12px}
++.exercise-expanded .sethead{margin-top:4px}
++.exercise-expanded .sethead,.exercise-expanded .setrow{grid-template-columns:30px minmax(0,1fr) minmax(0,1fr) 48px 44px;gap:6px}
++.exercise-expanded .sethead{font-size:11px}
++.exercise-expanded .setrow{padding:4px 0}
++.exercise-expanded .stepper{grid-template-columns:38px minmax(0,1fr) 38px;border-radius:13px}
++.exercise-expanded .stepper button{height:46px;font-size:20px}
++.exercise-expanded .stepper input{font-size:16px;font-weight:800}
++.exercise-expanded .check{width:44px;height:44px;border-radius:13px}
++.exercise-expanded .setRir{min-height:44px;padding:0 4px;border-radius:12px;text-align:center}
++.exercise-expanded .reco{border-radius:14px;padding:11px}
++.exercise-expanded .reco strong{font-size:15px}
++
++.feedback-details{margin-top:12px;border-top:1px solid var(--line);padding-top:8px}
++.feedback-details summary{min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;list-style:none;font-weight:800;font-size:13px}
++.feedback-details summary::-webkit-details-marker{display:none}
++.feedback-state{font-size:11px;color:var(--muted);font-weight:600}
++.feedback-card{padding:8px 0 0!important}
++.feedback-card .switch{border-bottom:0}
++.feedback-card textarea{min-height:64px}
++
++.workout-actionbar{
++ position:fixed;left:0;right:0;bottom:0;z-index:80;
++ display:grid;grid-template-columns:52px 52px minmax(0,1fr);gap:8px;
++ max-width:720px;margin:auto;padding:8px 12px calc(8px + env(safe-area-inset-bottom));
++ background:rgba(12,15,20,.96);backdrop-filter:blur(16px);
++ border-top:1px solid #283244;
++}
++.workout-actionbar button{min-height:52px;border-radius:15px;font:inherit;font-weight:850}
++.action-icon,.action-add{border:1px solid #303b4e;background:#18202c;color:#eef3fb;font-size:21px}
++.action-next{border:0;background:var(--accent);color:#071020;font-size:16px}
++.action-next span{font-size:20px;margin-left:4px}
++.workout-actionbar button:disabled{opacity:.35}
++.timer{
++ left:10px;right:10px;bottom:calc(76px + env(safe-area-inset-bottom));
++ border-radius:16px;padding:10px 12px;
++ background:rgba(18,27,40,.98);border-color:#345175;
++ box-shadow:0 14px 42px rgba(0,0,0,.48)
++}
++.timer .time{font-size:25px}
++.timer .btn{min-height:40px}
++
++@media(max-width:390px){
++ .workout-quickstats{gap:5px}
++ .workout-quickstats span{padding:5px 7px}
++ .exercise-summary{grid-template-columns:30px minmax(0,1fr);gap:8px}
++ .exercise-meta{grid-column:2;text-align:left;font-size:11px}
++ .exercise-expanded .sethead,.exercise-expanded .setrow{grid-template-columns:28px minmax(0,1fr) minmax(0,1fr) 45px 42px;gap:4px}
++ .exercise-expanded .stepper{grid-template-columns:32px minmax(0,1fr) 32px}
++}
++
+ </style>
+ </head>
+ <body>
+ <div class="app">
+   <div class="top">
+-    <div class="brand"><h1>SviatFit <span style="font-size:13px;color:var(--muted);font-weight:700">1.6.0</span></h1><span class="badge" id="todayBadge"></span></div>
++    <div class="brand"><h1>SviatFit <span style="font-size:13px;color:var(--muted);font-weight:700">1.6.1</span></h1><span class="badge" id="todayBadge"></span></div>
+   </div>
+   <main id="screen" class="screen"></main>
+ </div>
+@@ -559,14 +650,16 @@
+   <div class="row wrap exercise-tools"><button class="btn secondary" id="techBtn">Техніка / фото</button>${ex.type==='strength'?'<button class="btn secondary" id="plateBtn">Млинці</button>':''}</div>
+   ${ex.recommendation?`<div class="reco"><div class="muted small">МИНУЛОГО РАЗУ: ${esc(ex.recommendation.previous)} · ${fmtDate(ex.recommendation.date)}</div><div class="row between wrap" style="margin-top:6px"><div><span class="muted small">РЕКОМЕНДАЦІЇ ЗА СЕТАМИ</span><br><strong>${(ex.recommendation.sets||[]).map((x,i)=>`${i+1}: ${x.weight} кг × ${x.reps}`).join(' · ')||`${ex.recommendation.weight} кг`}</strong><div class="muted small">${esc(ex.recommendation.reason)}</div></div><button class="btn secondary" id="applyReco">Застосувати</button></div></div>`:''}
+   ${renderExerciseInput(ex)}
+-  <div class="feedback-card" style="padding-top:13px">
+-   <b>Як відчувається?</b>
+-   <div class="tags" id="diffTags">${['Легко','Нормально','Важко','Дуже важко'].map(v=>`<button class="chip ${ex.feedback.difficulty===v?'on':''}" data-v="${v}">${v}</button>`).join('')}</div>
+-   <div class="muted small" style="margin:8px 0">RIR — скільки повторів залишалося в запасі; виставляється окремо в кожному сеті.</div>
+-   <div class="switch"><span>Біль / дискомфорт</span><button class="chip ${ex.feedback.pain?'on':''}" id="painBtn">${ex.feedback.pain?'Так':'Ні'}</button></div>
+-   <label>Нотатка</label><textarea id="note" placeholder="Напр. поперек відчував сильніше...">${esc(ex.feedback.note||'')}</textarea>
+-  </div>
+-  <div class="exercise-nav"><button class="btn secondary" id="prevExercise" ${index===0?'disabled':''}>← Попередня</button><button class="btn secondary" id="nextExercise" ${index===s.exercises.length-1?'disabled':''}>Наступна →</button></div>
++  <details class="feedback-details" ${(ex.feedback.difficulty||ex.feedback.pain||ex.feedback.note)?'open':''}>
++   <summary><span>Самопочуття / нотатка</span><span class="feedback-state">${ex.feedback.difficulty?esc(ex.feedback.difficulty):'не заповнено'}${ex.feedback.pain?' · ⚠':''}</span></summary>
++   <div class="feedback-card">
++    <b>Як відчувається?</b>
++    <div class="tags" id="diffTags">${['Легко','Нормально','Важко','Дуже важко'].map(v=>`<button class="chip ${ex.feedback.difficulty===v?'on':''}" data-v="${v}">${v}</button>`).join('')}</div>
++    <div class="muted small" style="margin:8px 0">RIR виставляється окремо для кожного сету.</div>
++    <div class="switch"><span>Біль / дискомфорт</span><button class="chip ${ex.feedback.pain?'on':''}" id="painBtn">${ex.feedback.pain?'Так':'Ні'}</button></div>
++    <label>Нотатка</label><textarea id="note" placeholder="Напр. поперек відчував сильніше...">${esc(ex.feedback.note||'')}</textarea>
++   </div>
++  </details>
+  </div>`;
+ }
+ function workoutExerciseListHtml(s){
+@@ -633,11 +726,22 @@
+  clearInterval(timerInt);
+  $('#screen').innerHTML=`
+   <div class="workout-overview">
+-   <div class="workout-topline"><div><div class="counter">ТРЕНУВАННЯ ${s.cycleWeek?`· ТИЖДЕНЬ ${s.cycleWeek}`:''}</div><h2>${esc(s.name)}</h2>${s.isDeload?'<span class="cycle-badge">Розвантажувальний тиждень · менше сетів і ваги</span>':''}</div><div class="row"><button class="btn secondary" id="finishWorkoutBtn">Фініш</button><button class="btn ghost" id="exitWorkout" aria-label="Закрити">✕</button></div></div>
+-   <div class="workout-stats"><div class="workout-stat"><span>ЗАГАЛЬНИЙ ЧАС</span><b id="elapsed">${fmtTime(elapsed)}</b></div><div class="workout-stat"><span>ВПРАВИ</span><b>${doneCount}/${s.exercises.length}</b></div></div>
++   <div class="workout-topline">
++    <div class="grow"><div class="counter">ТРЕНУВАННЯ ${s.cycleWeek?`· ТИЖДЕНЬ ${s.cycleWeek}`:''}</div><h2>${esc(s.name)}</h2>${s.isDeload?'<span class="cycle-badge">Розвантаження · менше сетів і ваги</span>':''}</div>
++    <div class="row workout-head-actions"><button class="btn secondary finish-btn" id="finishWorkoutBtn">Фініш</button><button class="icon-btn" id="exitWorkout" aria-label="Закрити тренування">✕</button></div>
++   </div>
++   <div class="workout-quickstats"><span><b id="elapsed">${fmtTime(elapsed)}</b><small>час</small></span><span><b>${doneCount}/${s.exercises.length}</b><small>вправ</small></span><span><b>${s.index+1}/${s.exercises.length}</b><small>зараз</small></span></div>
+    <div class="progressbar"><div style="width:${100*doneCount/Math.max(1,s.exercises.length)}%"></div></div>
+   </div>
+-  <div class="card workout-list"><div class="workout-list-head"><div><b>Вправи цього дня</b><div class="muted small">Натисни будь-яку, щоб перейти до її сетів</div></div><button class="btn secondary" id="addExerciseNow">+ Вправа</button></div>${workoutExerciseListHtml(s)}</div>`;
++  <div class="workout-list">
++   <div class="workout-list-head"><div><b>Вправи</b><div class="muted small">Натисни на будь-яку вправу, якщо тренажер зайнятий</div></div></div>
++   ${workoutExerciseListHtml(s)}
++  </div>
++  <div class="workout-actionbar" role="navigation" aria-label="Навігація по вправах">
++   <button class="action-icon" id="prevExerciseAction" ${s.index===0?'disabled':''} aria-label="Попередня вправа">←</button>
++   <button class="action-add" id="addExerciseNow" aria-label="Додати вправу">＋</button>
++   <button class="action-next" id="nextExerciseAction" ${s.index===s.exercises.length-1?'disabled':''}>Далі <span>→</span></button>
++  </div>`;
+  if(rest.active){tickRestTimer();if(rest.active)nativeCall('startRestTimer',rest.left,!!state.settings.sound,!!state.settings.vibration,s.name,s.start)}
+  else nativeCall('startWorkoutTimer',s.name,s.start);
+  timerInt=setInterval(()=>{const e=$('#elapsed');if(e)e.textContent=fmtTime(Math.floor((Date.now()-s.start)/1000))},1000);
+@@ -652,8 +756,8 @@
+  $('#painBtn').onclick=()=>{ex.feedback.pain=!ex.feedback.pain;save();renderWorkout()};
+  $$('#diffTags .chip').forEach(button=>button.onclick=()=>{ex.feedback.difficulty=button.dataset.v;save();renderWorkout()});
+  $('#note').onchange=event=>{ex.feedback.note=event.target.value;save()};
+- $('#prevExercise').onclick=()=>goExercise(s.index-1);
+- $('#nextExercise').onclick=()=>goExercise(s.index+1);
++ $('#prevExerciseAction').onclick=()=>goExercise(s.index-1);
++ $('#nextExerciseAction').onclick=()=>goExercise(s.index+1);
+  $('#addExerciseNow').onclick=()=>addExerciseToCurrent();
+  drawTimer();
+ }
+@@ -1210,7 +1314,7 @@
+   <b>Дані</b><p class="muted small">Все зберігається локально на телефоні. Експорт можна скопіювати або поділитися напряму в ChatGPT.</p>
+   <div class="row wrap"><button class="btn secondary" id="backupJson">Резервна копія</button><button class="btn secondary" id="restoreBtn">Відновити</button><input class="hidden" id="restoreFile" type="file" accept="application/json,.json"><button class="btn secondary" id="importPlan">Імпорт плану</button><input class="hidden" id="planFile" type="file" accept="application/json,.json"><button class="btn danger" id="resetData">Скинути дані</button></div>
+  </div>
+- <div class="card"><b>SviatFit 1.6.0</b><p class="muted small">Тренувальний планер з профілями залів, розминкою, циклами прогресії, обміном планами та таймером на екрані блокування.</p></div>`;
++ <div class="card"><b>SviatFit 1.6.1</b><p class="muted small">Тренувальний планер з профілями залів, розминкою, циклами прогресії, обміном планами та таймером на екрані блокування.</p></div>`;
+  $('#activeGymSelect').onchange=()=>{state.activeGymId=$('#activeGymSelect').value;save();renderSettings()};
+  $('#manageGyms').onclick=gymSheet;
+  $('#autoWarmups').onclick=()=>{s.autoWarmups=!s.autoWarmups;save();renderSettings()};
