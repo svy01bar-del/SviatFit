@@ -79,7 +79,7 @@ jobs:
           retention-days: 90
 
   android:
-    needs: prepare
+    needs: [prepare, web]
     name: Android build and bundled OCR emulator test
     runs-on: ubuntu-latest
     timeout-minutes: 35
