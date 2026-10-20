@@ -1,0 +1,141 @@
+name: Pflege Deutsch build and offline QA
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'pflege/**'
+      - '.github/workflows/pflege-build.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pflege-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Offline course and Windows checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Generate sources and desktop package
+        run: python3 pflege/build.py --out pflege/generated
+      - name: Install test runtime
+        run: npm install --prefix pflege/generated --no-save --ignore-scripts playwright@1.56.1
+      - name: Install Chromium
+        run: pflege/generated/node_modules/.bin/playwright install --with-deps chromium
+      - name: Verify offline learning flows
+        run: node pflege/generated/qa.cjs pflege/generated
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pflege-desktop-and-source
+          path: |
+            pflege/generated/artifacts/*.zip
+            pflege/generated/qa-report.json
+          retention-days: 90
+
+  android:
+    name: Android build and bundled OCR emulator test
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Generate Android project
+        run: python3 pflege/build.py --out pflege/generated
+      - name: Build Android packages
+        run: gradle -p pflege/generated/android --no-daemon assembleDebug assembleDebugAndroidTest
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Android offline instrumented QA
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_7_pro
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          script: |
+            adb devices
+            adb shell svc wifi disable
+            adb shell svc data disable
+            gradle -p pflege/generated/android --no-daemon connectedDebugAndroidTest
+            adb logcat -b crash -d > pflege/generated/android-crash.log
+      - name: Collect APK
+        run: |
+          cp pflege/generated/android/app/build/outputs/apk/debug/app-debug.apk pflege/generated/artifacts/Sviat_Pflege_Deutsch_1.0.apk
+          unzip -t pflege/generated/artifacts/Sviat_Pflege_Deutsch_1.0.apk
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pflege-android
+          path: |
+            pflege/generated/artifacts/*.apk
+            pflege/generated/android/app/build/outputs/androidTest-results/**
+            pflege/generated/android/app/build/reports/androidTests/**
+            pflege/generated/android-crash.log
+          retention-days: 90
+
+  release:
+    name: Publish tested learning packages
+    needs: [web, android]
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: pflege-desktop-and-source
+          path: packages
+      - uses: actions/download-artifact@v4
+        with:
+          name: pflege-android
+          path: android-packages
+      - name: Collect and hash packages
+        run: |
+          cp android-packages/Sviat_Pflege_Deutsch_1.0.apk packages/
+          cd packages
+          sha256sum Sviat_Pflege_Deutsch_1.0.apk Sviat_Pflege_Windows.zip Sviat_Pflege_Source.zip > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+      - name: Publish download links
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          cat > "$RUNNER_TEMP/pflege-release.txt" <<'NOTES'
+          Навчальна програма Sviat Pflege Deutsch: 12 тем, 24 підпункти, 168 карток, 82 відповіді з поясненнями.
+          Android APK та офлайн-версія для Windows (відкрийте Start_Pflege.cmd).
+          Усі слова навчального курсу мають вбудований український переклад. Android: довільний переклад після одноразового завантаження моделей; локальне розпізнавання PDF-сканів.
+          Витягнуто доступний текстовий шар 7 PDF; три скани потребують OCR. Вправи авторські; оригінальні книжки не публікуються.
+          Перевірки: Chromium офлайн, екрани 320/393/430/1366px; Android 35 — запуск, словник, тема й OCR тестового PDF без мережі.
+          APK тестової збірки; перед наступним перевстановленням експортуйте прогрес.
+          NOTES
+          if gh release view pflege-v1.0.0 >/dev/null 2>&1; then
+            gh release upload pflege-v1.0.0 packages/Sviat_Pflege_Deutsch_1.0.apk packages/Sviat_Pflege_Windows.zip packages/Sviat_Pflege_Source.zip packages/qa-report.json packages/SHA256SUMS.txt --clobber
+          else
+            gh release create pflege-v1.0.0 packages/Sviat_Pflege_Deutsch_1.0.apk packages/Sviat_Pflege_Windows.zip packages/Sviat_Pflege_Source.zip packages/qa-report.json packages/SHA256SUMS.txt --target "$HEAD_SHA" --title "Sviat Pflege Deutsch 1.0" --notes-file "$RUNNER_TEMP/pflege-release.txt"
+          fi
+          gh release view pflege-v1.0.0 --json url,assets
