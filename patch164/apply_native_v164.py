@@ -34,7 +34,11 @@ qa_old = '''        if ("full_flow".equals(action)) {
 qa_new = '''        if ("vitamins_flow".equals(action)) {
             view.evaluateJavascript(
                     "(function(){return window.sviatQaVitamins?window.sviatQaVitamins():'NO_VITAMINS_QA';})()",
-                    value -> Log.i("SviatQA", "VITAMINS=" + value)
+                    value -> {
+                        Log.i("SviatQA", "VITAMINS=" + value);
+                        SupplementReminderReceiver.schedule(getApplicationContext(), "ZMA", 23, 59);
+                        Log.i("SviatQA", "REMINDER_SCHEDULED=ZMA");
+                    }
             );
             return;
         }
