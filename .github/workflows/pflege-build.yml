@@ -157,7 +157,9 @@ jobs:
           path: android-packages
       - name: Collect and hash packages
         run: |
-          cp android-packages/Sviat_Pflege_Deutsch_1.0.apk packages/
+          cp android-packages/artifacts/Sviat_Pflege_Deutsch_1.0.apk packages/
+          cp packages/artifacts/Sviat_Pflege_Windows.zip packages/
+          cp packages/artifacts/Sviat_Pflege_Source.zip packages/
           cd packages
           sha256sum Sviat_Pflege_Deutsch_1.0.apk Sviat_Pflege_Windows.zip Sviat_Pflege_Source.zip > SHA256SUMS.txt
           cat SHA256SUMS.txt
