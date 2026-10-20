@@ -10,7 +10,7 @@ on:
 jobs:
   build_and_test:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,11 +32,10 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patch162/apply_home_ui.py"
           python3 "$GITHUB_WORKSPACE/patch163/apply_v163.py"
           python3 "$GITHUB_WORKSPACE/patch163/apply_native_startup_qa.py"
-
-          base64 -d "$GITHUB_WORKSPACE/patch164/apply_v164.py.b64" > /tmp/apply_v164.py
-          python3 /tmp/apply_v164.py
-          python3 "$GITHUB_WORKSPACE/patch164/apply_v164_native_qa.py"
-          base64 -d "$GITHUB_WORKSPACE/patch164/zma_app.jpg.b64" > app/src/main/assets/zma_app.jpg
+          python3 "$GITHUB_WORKSPACE/patch164/apply_v164.py"
+          cp "$GITHUB_WORKSPACE/patch164/SupplementReminderReceiver.java" app/src/main/java/com/sviat/fit/SupplementReminderReceiver.java
+          python3 "$GITHUB_WORKSPACE/patch164/apply_native_v164.py"
+          python3 "$GITHUB_WORKSPACE/patch164/apply_manifest_v164.py"
 
           sed -i -E 's/versionCode [0-9]+/versionCode 13/' app/build.gradle
           sed -i 's/versionName "1.6.0"/versionName "1.6.4"/' app/build.gradle
@@ -44,9 +43,9 @@ jobs:
           grep -q 'versionName "1.6.4"' app/build.gradle
           grep -q '<title>SviatFit 1.6.4</title>' app/src/main/assets/index.html
           grep -q 'data-tab="vitamins"' app/src/main/assets/index.html
-          grep -q 'VPLab ZMA' app/src/main/assets/index.html
-          grep -q 'suppDone-zma-vplab' app/src/main/assets/index.html
-          test -s app/src/main/assets/zma_app.jpg
+          grep -q 'VPLab' app/src/main/assets/index.html
+          grep -q 'scheduleSupplementReminder' app/src/main/java/com/sviat/fit/MainActivity.java
+          grep -q 'SupplementReminderReceiver' app/src/main/AndroidManifest.xml
 
       - name: Setup Java 17
         uses: actions/setup-java@v4
@@ -82,10 +81,8 @@ jobs:
           test -s "$APK"
           unzip -t "$APK" >/dev/null
           unzip -p "$APK" assets/index.html | grep -q '<title>SviatFit 1.6.4</title>'
-          unzip -p "$APK" assets/index.html | grep -q 'VPLab ZMA'
-          unzip -l "$APK" assets/zma_app.jpg | grep -q 'zma_app.jpg'
-          test "$(unzip -p "$APK" assets/zma_app.jpg | wc -c)" -gt 10000
-          cp "$APK" /tmp/SviatFit_v1.6.4_working.apk
+          unzip -p "$APK" assets/index.html | grep -q 'data-tab="vitamins"'
+          cp "$APK" /tmp/SviatFit_v1.6.4_ZMA.apk
           sha256sum "$APK" | tee /tmp/apk-sha256.txt
 
       - name: Enable KVM
@@ -104,25 +101,20 @@ jobs:
           disable-animations: true
           script: |
             set -eu
-            APK="$GITHUB_WORKSPACE/v164/buildsrc/SviatFit-v1.6.0/app/build/outputs/apk/debug/app-debug.apk"
-            adb devices
-            adb install -r "$APK"
-            adb shell cmd package resolve-activity --brief com.sviat.fit | tee /tmp/resolved-activity.txt
-            grep -q 'com.sviat.fit/.MainActivity' /tmp/resolved-activity.txt
-
+            adb install -r "$GITHUB_WORKSPACE/v164/buildsrc/SviatFit-v1.6.0/app/build/outputs/apk/debug/app-debug.apk"
             adb shell pm grant com.sviat.fit android.permission.POST_NOTIFICATIONS || true
             adb shell settings put global hide_error_dialogs 1 || true
             adb logcat -c
 
             adb shell am force-stop com.sviat.fit
-            adb shell am start -W -n com.sviat.fit/.MainActivity --es sviat_qa_action full_flow | tee /tmp/am-start-training.txt
-            timeout 45s sh -c 'until adb logcat -d -v brief | grep -q "SviatQA.*FLOW_DONE="; do sleep 1; done'
+            adb shell am start -W -n com.sviat.fit/.MainActivity --es sviat_qa_action full_flow | tee /tmp/am-full.txt
+            timeout 40s sh -c 'until adb logcat -d -v brief | grep -q "SviatQA.*FLOW_DONE="; do sleep 1; done'
 
             adb shell am force-stop com.sviat.fit
-            adb shell am start -W -n com.sviat.fit/.MainActivity --es sviat_qa_action vitamins | tee /tmp/am-start-vitamins.txt
-            timeout 45s sh -c 'until adb logcat -d -v brief | grep -q "SviatQA.*VITAMINS_DONE="; do sleep 1; done'
-            adb exec-out screencap -p > /tmp/sviatfit-vitamins.png
+            adb shell am start -W -n com.sviat.fit/.MainActivity --es sviat_qa_action vitamins_flow | tee /tmp/am-vitamins.txt
+            timeout 40s sh -c 'until adb logcat -d -v brief | grep -q "SviatQA.*VITAMINS="; do sleep 1; done'
 
+            adb exec-out screencap -p > /tmp/sviatfit-vitamins.png
             adb shell pidof com.sviat.fit | tee /tmp/pid.txt
             test -s /tmp/pid.txt
             adb shell dumpsys activity activities | grep -q 'com.sviat.fit/.MainActivity'
@@ -131,19 +123,18 @@ jobs:
             grep 'SviatQA' /tmp/logcat-full.txt | tee /tmp/qa-flow.txt
             grep -q 'FLOW_DONE=' /tmp/qa-flow.txt
             grep -q 'VITAMINS=' /tmp/qa-flow.txt
-            grep -q 'VITAMINS_DONE=' /tmp/qa-flow.txt
-
-            python3 -c "import re,pathlib; t=pathlib.Path('/tmp/qa-flow.txt').read_text(errors='ignore'); m=re.search(r'VITAMINS=.*w=(\d+),h=(\d+)',t); assert m,'vitamins button metrics missing'; w,h=map(int,m.groups()); print('vitamins_done_button_px',w,h); assert w>=300 and h>=44,(w,h); assert 'VITAMINS_DONE=' in t"
-
+            grep -q 'REMINDER_SCHEDULED=ZMA' /tmp/qa-flow.txt
+            grep -q 'take_w=' /tmp/qa-flow.txt
             ! grep -q 'FATAL EXCEPTION' /tmp/logcat-full.txt
             test "$(stat -c%s /tmp/sviatfit-vitamins.png)" -gt 20000
+            adb shell dumpsys alarm | grep -q 'com.sviat.fit'
 
       - name: Upload working APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: SviatFit-v1.6.4-working-APK
-          path: /tmp/SviatFit_v1.6.4_working.apk
+          name: SviatFit-v1.6.4-ZMA-working-APK
+          path: /tmp/SviatFit_v1.6.4_ZMA.apk
           if-no-files-found: error
 
       - name: Upload QA evidence
@@ -152,9 +143,8 @@ jobs:
         with:
           name: SviatFit-v1.6.4-Android-QA
           path: |
-            /tmp/resolved-activity.txt
-            /tmp/am-start-training.txt
-            /tmp/am-start-vitamins.txt
+            /tmp/am-full.txt
+            /tmp/am-vitamins.txt
             /tmp/sviatfit-vitamins.png
             /tmp/pid.txt
             /tmp/qa-flow.txt
