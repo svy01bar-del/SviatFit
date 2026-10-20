@@ -16,7 +16,7 @@ css = r"""
 .vit-head h2{margin:0}
 .vit-card{padding:14px;border-radius:18px;background:#151c27;border:1px solid #2a3648}
 .vit-product{display:grid;grid-template-columns:60px minmax(0,1fr);gap:12px;align-items:center}
-.vit-photo{width:60px;height:76px;border-radius:14px;object-fit:cover;background:#0f141b;border:1px solid #33475f}
+.vit-icon{width:60px;height:60px;border-radius:16px;display:grid;place-items:center;font-size:30px;background:#1d2b3a;border:1px solid #33475f}
 .vit-title{font-size:20px;font-weight:900;line-height:1.1}
 .vit-brand{font-size:12px;color:var(--muted);margin-top:3px}
 .vit-dose{margin-top:10px;padding:10px 12px;border-radius:14px;background:#101720;border:1px solid #29384b}
@@ -71,7 +71,6 @@ if(!Array.isArray(state.supplements)||!state.supplements.length){
   id:'zma-vplab',
   name:'ZMA',
   brand:'VPLab',
-  photo:'zma_app.jpg',
   capsulesPerDay:3,
   reminderTime:'22:30',
   reminderEnabled:false,
@@ -84,7 +83,6 @@ if(!Array.isArray(state.supplements)||!state.supplements.length){
  }];
 }
 if(!state.supplementLog||typeof state.supplementLog!=='object')state.supplementLog={};
-if(state.supplements[0]&&!state.supplements[0].photo)state.supplements[0].photo='zma_app.jpg';
 """
 if state_marker not in s:
     raise SystemExit("state supplement insertion point not found")
@@ -110,7 +108,7 @@ function renderVitamins(){
   <div class="vit-head"><div><div class="muted small">ЩОДЕННИЙ ЧЕК-ЛИСТ</div><h2>Вітаміни</h2></div><span class="pill">${todayTaken?'✓ сьогодні':'ще не прийнято'}</span></div>
   <div class="vit-card">
    <div class="vit-product">
-    <img class="vit-photo" src="${esc(sup.photo||'zma_app.jpg')}" alt="${esc(sup.name)}">
+    <div class="vit-icon">💊</div>
     <div><div class="vit-title">${esc(sup.name)}</div><div class="vit-brand">${esc(sup.brand)} · ${sup.capsulesPerDay} капсули / день</div></div>
    </div>
    <div class="vit-dose"><strong>За етикеткою: ${sup.capsulesPerDay} капсули</strong><div class="muted small" style="margin-top:4px">${esc(sup.labelNote)}</div></div>
