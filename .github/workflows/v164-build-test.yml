@@ -33,6 +33,8 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patch163/apply_v163.py"
           python3 "$GITHUB_WORKSPACE/patch163/apply_native_startup_qa.py"
           python3 "$GITHUB_WORKSPACE/patch164/apply_v164.py"
+          base64 -d "$GITHUB_WORKSPACE/patch164/zma_app.jpg.b64" > app/src/main/assets/zma_app.jpg
+          test "$(stat -c%s app/src/main/assets/zma_app.jpg)" -gt 10000
           cp "$GITHUB_WORKSPACE/patch164/SupplementReminderReceiver.java" app/src/main/java/com/sviat/fit/SupplementReminderReceiver.java
           python3 "$GITHUB_WORKSPACE/patch164/apply_native_v164.py"
           python3 "$GITHUB_WORKSPACE/patch164/apply_manifest_v164.py"
@@ -82,6 +84,7 @@ jobs:
           unzip -t "$APK" >/dev/null
           unzip -p "$APK" assets/index.html | grep -q '<title>SviatFit 1.6.4</title>'
           unzip -p "$APK" assets/index.html | grep -q 'data-tab="vitamins"'
+          unzip -l "$APK" assets/zma_app.jpg | grep -q 'zma_app.jpg'
           cp "$APK" /tmp/SviatFit_v1.6.4_ZMA.apk
           sha256sum "$APK" | tee /tmp/apk-sha256.txt
 
