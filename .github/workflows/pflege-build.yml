@@ -15,7 +15,37 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  prepare:
+    name: Prepare bundled German audio and course
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/cache@v4
+        with:
+          path: |
+            pflege/piper-cache
+            pflege/audio-cache
+          key: pflege-thorsten-audio-v1
+      - name: Generate project files
+        run: python3 pflege/build.py --out pflege/generated
+      - name: Install build-time speech synthesizer
+        run: pip install piper-tts==1.3.0
+      - name: Prepare German voice clips
+        run: python3 pflege/generated/build-audio.py --root pflege/generated
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pflege-prepared-project
+          path: pflege/generated/
+          retention-days: 30
+
   web:
+    needs: prepare
     name: Offline course and Windows checks
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -26,8 +56,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Generate sources and desktop package
-        run: python3 pflege/build.py --out pflege/generated
+      - uses: actions/download-artifact@v4
+        with:
+          name: pflege-prepared-project
+          path: pflege/generated
       - name: Install test runtime
         run: npm install --prefix pflege/generated --no-save --ignore-scripts playwright@1.56.1
       - name: Install Chromium
@@ -40,9 +72,11 @@ jobs:
           path: |
             pflege/generated/artifacts/*.zip
             pflege/generated/qa-report.json
+            pflege/generated/audio-report.json
           retention-days: 90
 
   android:
+    needs: prepare
     name: Android build and bundled OCR emulator test
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -61,8 +95,10 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
-      - name: Generate Android project
-        run: python3 pflege/build.py --out pflege/generated
+      - uses: actions/download-artifact@v4
+        with:
+          name: pflege-prepared-project
+          path: pflege/generated
       - name: Build Android packages
         run: gradle -p pflege/generated/android --no-daemon assembleDebug assembleDebugAndroidTest
       - name: Enable emulator acceleration
@@ -131,7 +167,7 @@ jobs:
           cat > "$RUNNER_TEMP/pflege-release.txt" <<'NOTES'
           Навчальна програма Sviat Pflege Deutsch: 12 тем, 24 підпункти, 168 карток, 82 відповіді з поясненнями.
           Android APK та офлайн-версія для Windows (відкрийте Start_Pflege.cmd).
-          Усі слова навчального курсу мають вбудований український переклад. Android: довільний переклад після одноразового завантаження моделей; локальне розпізнавання PDF-сканів.
+          Усі слова навчального курсу мають вбудований український переклад. Аудіо курсу та словника також вбудоване. Android: довільний переклад після одноразового завантаження моделей; локальне розпізнавання PDF-сканів.
           Витягнуто доступний текстовий шар 7 PDF; три скани потребують OCR. Вправи авторські; оригінальні книжки не публікуються.
           Перевірки: Chromium офлайн, екрани 320/393/430/1366px; Android 35 — запуск, словник, тема й OCR тестового PDF без мережі.
           APK тестової збірки; перед наступним перевстановленням експортуйте прогрес.
