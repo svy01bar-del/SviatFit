@@ -155,7 +155,7 @@ function renderVitamins(){
 }
 
 window.sviatQaVitamins=()=>{
- tab='vitamins';render();
+ state.current=null;save();tab='vitamins';render();
  const take=document.getElementById('takeSupplement');
  const reminder=document.getElementById('suppReminder');
  const time=document.getElementById('suppTime');
