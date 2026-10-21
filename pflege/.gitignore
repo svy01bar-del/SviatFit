@@ -1,0 +1,6 @@
+generated/
+piper-cache/
+audio-cache/
+__pycache__/
+ui-*.png
+missing-words.json

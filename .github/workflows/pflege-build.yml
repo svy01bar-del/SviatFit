@@ -1,0 +1,192 @@
+name: Pflege Deutsch build and offline QA
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'pflege/**'
+      - '.github/workflows/pflege-build.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pflege-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  prepare:
+    name: Prepare bundled German audio and course
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/cache@v4
+        with:
+          path: |
+            pflege/piper-cache
+            pflege/audio-cache
+          key: pflege-thorsten-audio-v1.1
+          restore-keys: pflege-thorsten-audio-v1
+      - name: Generate project files
+        run: python3 pflege/build.py --out pflege/generated
+      - name: Install build-time speech synthesizer
+        run: |
+          pip install piper-tts==1.3.0
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+      - name: Prepare German voice clips
+        run: python3 pflege/generated/build-audio.py --root pflege/generated
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pflege-prepared-project
+          path: pflege/generated/
+          retention-days: 30
+
+  web:
+    needs: prepare
+    name: Offline course and Windows checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: pflege-prepared-project
+          path: pflege/generated
+      - name: Install test runtime
+        run: npm install --prefix pflege/generated --no-save --ignore-scripts playwright@1.56.1
+      - name: Install Chromium
+        run: pflege/generated/node_modules/.bin/playwright install --with-deps chromium
+      - name: Verify offline learning flows
+        run: node pflege/generated/qa.cjs pflege/generated
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pflege-desktop-and-source
+          path: |
+            pflege/generated/artifacts/*.zip
+            pflege/generated/qa-report.json
+            pflege/generated/audio-report.json
+          retention-days: 90
+
+  android:
+    needs: [prepare, web]
+    name: Android build and bundled OCR emulator test
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+          log-accepted-android-sdk-licenses: 'false'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - uses: actions/download-artifact@v4
+        with:
+          name: pflege-prepared-project
+          path: pflege/generated
+      - name: Retain the new app signing identity between builds
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: pflege-learning-signing-v1
+      - name: Build Android packages
+        run: gradle -p pflege/generated/android --no-daemon assembleDebug assembleDebugAndroidTest
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Android offline instrumented QA
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_7_pro
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          script: |
+            adb devices
+            adb shell svc wifi disable
+            adb shell svc data disable
+            gradle -p pflege/generated/android --no-daemon connectedDebugAndroidTest
+            adb logcat -b crash -d > pflege/generated/android-crash.log
+      - name: Collect APK
+        run: |
+          cp pflege/generated/android/app/build/outputs/apk/debug/app-debug.apk pflege/generated/artifacts/Sviat_Pflege_Deutsch_1.1.apk
+          unzip -t pflege/generated/artifacts/Sviat_Pflege_Deutsch_1.1.apk
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pflege-android
+          path: |
+            pflege/generated/artifacts/*.apk
+            pflege/generated/android/app/build/outputs/androidTest-results/**
+            pflege/generated/android/app/build/reports/androidTests/**
+            pflege/generated/android-crash.log
+          retention-days: 90
+
+  release:
+    name: Publish tested learning packages
+    needs: [web, android]
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: pflege-desktop-and-source
+          path: packages
+      - uses: actions/download-artifact@v4
+        with:
+          name: pflege-android
+          path: android-packages
+      - name: Collect and hash packages
+        run: |
+          cp android-packages/artifacts/Sviat_Pflege_Deutsch_1.1.apk packages/
+          cp packages/artifacts/Sviat_Pflege_Windows_1.1.zip packages/
+          cp packages/artifacts/Sviat_Pflege_Source_1.1.zip packages/
+          cd packages
+          sha256sum Sviat_Pflege_Deutsch_1.1.apk Sviat_Pflege_Windows_1.1.zip Sviat_Pflege_Source_1.1.zip > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+      - name: Publish download links
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          cat > "$RUNNER_TEMP/pflege-release.txt" <<'NOTES'
+          Sviat Pflege Deutsch 1.1: 18 тем, 36 підпунктів, 252 картки, 3 авторські навчальні випадки.
+          Додано розділ Ausbildung 2027: 9 напрямів рамкової програми, правила державного іспиту, 8-тижневий план мовної підготовки та офіційні посилання.
+          Нові теми: роль учня, профілактика, зміни стану, реабілітація, паліативний догляд, розуміння запитань іспиту.
+          Курс, переклади всіх слів навчальних вправ і синтезоване німецьке аудіо вбудовані та працюють офлайн.
+          Android 1.1 встановлюється поруч із 1.0: ключ підпису старої тестової збірки не збережений. Експортуйте JSON у старій програмі й імпортуйте в новій. Не видаляйте стару до перевірки перенесення.
+          Windows: розпакуйте ZIP, відкрийте Start_Pflege.cmd або index.html. Перед перенесенням з іншої папки експортуйте резервну копію.
+          Навчальні випадки авторські й не є офіційними екзаменаційними білетами. Довільний переклад імпортованих текстів на Android потребує одноразового завантаження моделей. Для зовнішніх офіційних матеріалів потрібен інтернет.
+          NOTES
+          if gh release view pflege-v1.1.0 >/dev/null 2>&1; then
+            gh release upload pflege-v1.1.0 packages/Sviat_Pflege_Deutsch_1.1.apk packages/Sviat_Pflege_Windows_1.1.zip packages/Sviat_Pflege_Source_1.1.zip packages/qa-report.json packages/SHA256SUMS.txt --clobber
+          else
+            gh release create pflege-v1.1.0 packages/Sviat_Pflege_Deutsch_1.1.apk packages/Sviat_Pflege_Windows_1.1.zip packages/Sviat_Pflege_Source_1.1.zip packages/qa-report.json packages/SHA256SUMS.txt --target "$HEAD_SHA" --title "Sviat Pflege Deutsch 1.1" --notes-file "$RUNNER_TEMP/pflege-release.txt"
+          fi
+          gh release view pflege-v1.1.0 --json url,assets
