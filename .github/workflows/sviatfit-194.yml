@@ -18,14 +18,14 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
-      - name: Use preinstalled Android SDK and install build tools
+      - name: Confirm preinstalled Android SDK
         shell: bash
         run: |
           echo "ANDROID_HOME=$ANDROID_HOME"
-          SDKMANAGER="$(find "$ANDROID_HOME" -type f -name sdkmanager | head -1)"
-          test -n "$SDKMANAGER"
-          yes | "$SDKMANAGER" --licenses >/dev/null || true
-          "$SDKMANAGER" 'platforms;android-35' 'build-tools;35.0.0' 'platform-tools'
+          ls "$ANDROID_HOME/platforms" | tail -15
+          ls "$ANDROID_HOME/build-tools" | tail -15
+          test -f "$ANDROID_HOME/platforms/android-35/android.jar"
+          test -x "$ANDROID_HOME/build-tools/35.0.0/apksigner"
       - name: Restore SviatFit 1.9.4 offline source
         shell: bash
         run: |
