@@ -1,0 +1,92 @@
+name: SviatFit 1.9.4 Gradle build and Android emulator smoke
+on:
+  push:
+    branches: [sviatfit-194]
+  workflow_dispatch:
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Setup SDK
+        uses: android-actions/setup-android@v3
+      - name: Restore SviatFit 1.9.4 offline source
+        shell: bash
+        run: |
+          mkdir -p buildsrc
+          base64 -d v194/source.tar.gz.b64 > /tmp/sviatfit-source.tar.gz
+          echo '417a927e837f2c639602dc5247caf3ef18c512372842794e473ef314418b16f1  /tmp/sviatfit-source.tar.gz' | sha256sum -c -
+          tar -xzf /tmp/sviatfit-source.tar.gz -C buildsrc
+          test -f buildsrc/app/src/main/java/com/sviat/fitnext/MainActivity.java
+          ! grep -r -q 'SVIAT_RECOVERED=' buildsrc/app/src/main/assets/
+      - name: Build APK using Android Gradle Plugin
+        working-directory: buildsrc
+        run: |
+          gradle --version
+          gradle :app:assembleDebug --stacktrace
+      - name: Verify Android APK with official SDK tools
+        run: |
+          set -e
+          APK=buildsrc/app/build/outputs/apk/debug/app-debug.apk
+          BT="$ANDROID_HOME/build-tools/35.0.0"
+          test -s "$APK"
+          "$BT/aapt" dump badging "$APK" | tee /tmp/sviatfit-badging.txt
+          "$BT/apksigner" verify --verbose --print-certs "$APK" | tee /tmp/sviatfit-signature.txt
+          unzip -t "$APK" | tail -4
+          unzip -p "$APK" assets/index.html | grep -q '1.9.4'
+          unzip -l "$APK" | grep -q 'classes.dex'
+          grep -q "package: name='com.sviat.fit.fit194'" /tmp/sviatfit-badging.txt
+      - name: Emulator install, launch, reinstall, launch
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_7
+          disable-animations: true
+          emulator-boot-timeout: 600
+          script: |
+            set -eu
+            APK="$GITHUB_WORKSPACE/buildsrc/app/build/outputs/apk/debug/app-debug.apk"
+            adb install -r "$APK" | tee /tmp/sviatfit-install.txt
+            adb shell pm path com.sviat.fit.fit194 | tee /tmp/sviatfit-package.txt
+            adb logcat -c
+            adb shell am start -W -n com.sviat.fit.fit194/com.sviat.fitnext.MainActivity | tee /tmp/sviatfit-start.txt
+            sleep 12
+            adb shell pidof com.sviat.fit.fit194 | tee /tmp/sviatfit-pid.txt
+            adb exec-out screencap -p > /tmp/sviatfit-first.png
+            adb install -r "$APK" | tee /tmp/sviatfit-reinstall.txt
+            adb shell am force-stop com.sviat.fit.fit194
+            adb shell am start -W -n com.sviat.fit.fit194/com.sviat.fitnext.MainActivity | tee /tmp/sviatfit-restart.txt
+            sleep 8
+            adb shell pidof com.sviat.fit.fit194 | tee /tmp/sviatfit-repid.txt
+            adb exec-out screencap -p > /tmp/sviatfit-second.png
+            adb logcat -d -v brief > /tmp/sviatfit-logcat.txt
+            if grep -E 'FATAL EXCEPTION|Process: com.sviat.fit.fit194' /tmp/sviatfit-logcat.txt ; then echo 'Android crash detected'; exit 1; fi
+            echo 'Android emulator: install, start, reinstall, restart OK'
+      - name: Upload compiled APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SviatFit-1.9.4-Android-APK
+          path: buildsrc/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: warn
+      - name: Upload emulator diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SviatFit-1.9.4-Test-Report
+          path: |
+            /tmp/sviatfit-*.txt
+            /tmp/sviatfit-*.png
+          if-no-files-found: warn
