@@ -1,0 +1,38 @@
+name: Publish SviatFit UI 199 - delete test workouts (no APK)
+on:
+  push:
+    branches: [sviatfit-update-foundation]
+    paths:
+      - 'v199/parts/**'
+      - '.github/workflows/publish-ui-199.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rebuild signed UI update archive
+        shell: bash
+        run: |
+          cat v199/parts/part*.txt | base64 -d > /tmp/sviatfit-ui-199.zip
+          echo '6840ecb895eb1c5a205fa1c1ea406e9a61c17aadbb264504eb300e15ec2f15da  /tmp/sviatfit-ui-199.zip' | sha256sum -c -
+          unzip -t /tmp/sviatfit-ui-199.zip | tail -2
+          test "$(unzip -Z1 /tmp/sviatfit-ui-199.zip | wc -l)" -eq 11
+          test "$(unzip -p /tmp/sviatfit-ui-199.zip app.js | grep -c 'confirmDeleteHistory')" -gt 0
+          test "$(unzip -p /tmp/sviatfit-ui-199.zip native-adapter.js | grep -c 'deleteHistorySession')" -gt 0
+          test "$(unzip -p /tmp/sviatfit-ui-199.zip legacy.html | grep -c 'removeLegacyHistorySession')" -gt 0
+          if unzip -Z1 /tmp/sviatfit-ui-199.zip | grep -E '\.(apk|dex|jar|so|pem|p12|keystore)$'; then echo 'Forbidden binary or secret'; exit 1; fi
+      - name: Publish OTA release (no APK)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if gh release view ui-199 >/dev/null 2>&1; then
+            gh release upload ui-199 /tmp/sviatfit-ui-199.zip --clobber
+          else
+            gh release create ui-199 /tmp/sviatfit-ui-199.zip --target sviatfit-update-foundation --title 'SviatFit UI 199: delete test workouts' --notes 'Signed WebView UI-only update. Allows deletion of individual completed test workouts from History, with confirmation and backup snapshot. Keeps all other workouts, measurements and settings. Does not require a new APK.'
+          fi
+          gh release view ui-199 --json assets --jq '.assets[].name' | grep -Fx 'sviatfit-ui-199.zip'
