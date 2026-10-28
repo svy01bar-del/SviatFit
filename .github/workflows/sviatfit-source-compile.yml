@@ -1,7 +1,5 @@
 name: SviatFit 1.9.5 APK build and verify
 on:
-  push:
-    branches: [sviatfit-update-foundation]
   workflow_dispatch:
 jobs:
   compile_only:
