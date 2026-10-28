@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "version": 196,
-  "bundleUrl": "https://github.com/svy01bar-del/SviatFit/releases/download/ui-196/sviatfit-ui-196.zip",
-  "sha256": "0cdba25f22023f39ae409376670eda1ad66811eecdb3c12e45c4e265cd58c8e1",
-  "signature": "xnH+CL/7WkVziW2XDg9VT6GY5ZYJ6U8h690s2UoRKTAFLoQlq/c/ZWxn4yHEQp99NdlT3JDWXW+TXdZdnIQRBA=="
+  "version": 197,
+  "bundleUrl": "https://github.com/svy01bar-del/SviatFit/releases/download/ui-197/sviatfit-ui-197.zip",
+  "sha256": "cec0cf50cb71e423b6cb81fca433d070084c8fb35d007a3e2e3cea2e80fad54a",
+  "signature": "13pFAKCcMRLujg/zcMPE12wU21RAAPS0I/fB80RfDQBL1zv6WGDUAcwLyTvolZ2M5OK3EKcOxSVgE9aIsSxpAw=="
 }
