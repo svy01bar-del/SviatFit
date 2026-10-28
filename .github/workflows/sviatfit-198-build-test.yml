@@ -1,0 +1,109 @@
+name: SviatFit 1.9.8 build, signature inputs, Android emulator QA
+on:
+  push:
+    branches: [sviatfit-v198-fire-lockscreen]
+  workflow_dispatch:
+jobs:
+  build_test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Restore complete sources and exact user fire GIF
+        shell: bash
+        run: |
+          cat v198/parts/part*.txt | base64 -d > /tmp/sviatfit198.tar.gz
+          echo "062c230c8807578ca4a975dbb92583e94c4657d08571fd8802a33caa0f341da2  /tmp/sviatfit198.tar.gz" | sha256sum -c -
+          mkdir -p buildsrc
+          tar -xzf /tmp/sviatfit198.tar.gz -C buildsrc
+          mkdir -p buildsrc/app/src/main/res/drawable
+          base64 -d v198/ic_sviatfit.png.b64 > buildsrc/app/src/main/res/drawable/ic_sviatfit.png
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('buildsrc/app/src/main/AndroidManifest.xml')
+          s=p.read_text().replace('<application android:label="SviatFit"', '<application android:icon="@drawable/ic_sviatfit" android:roundIcon="@drawable/ic_sviatfit" android:label="SviatFit"')
+          assert '@drawable/ic_sviatfit' in s
+          p.write_text(s)
+          PY
+          test -f buildsrc/app/src/main/java/com/sviat/fitnext/RestTimerService.java
+          test -f buildsrc/app/src/main/assets/sviatfit_countdown_5_4_3_2_1_LOS.gif
+          test -f buildsrc/app/src/main/res/raw/rest_finish.wav
+          grep -q 'versionCode 198' buildsrc/app/build.gradle
+          node --check buildsrc/app/src/main/assets/app.js
+          node --check buildsrc/app/src/main/assets/native-adapter.js
+      - name: Verify preinstalled SDK
+        run: |
+          test -f "$ANDROID_HOME/platforms/android-35/android.jar"
+          test -f "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar"
+          test -x "$ANDROID_HOME/build-tools/35.0.0/zipalign"
+      - name: Compile release and debug with official Android Gradle Plugin
+        working-directory: buildsrc
+        run: gradle :app:assembleRelease :app:assembleDebug --no-daemon --stacktrace
+      - name: Verify packages and Android signing
+        run: |
+          set -eu
+          U=buildsrc/app/build/outputs/apk/release/app-release-unsigned.apk
+          D=buildsrc/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$U"
+          test -s "$D"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$D"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$D" | tee /tmp/sviatfit-badging.txt
+          grep -q "versionCode='198'" /tmp/sviatfit-badging.txt
+          grep -q "package: name='com.sviat.fit.stable'" /tmp/sviatfit-badging.txt
+          unzip -p "$D" assets/sviatfit_countdown_5_4_3_2_1_LOS.gif | sha256sum
+          unzip -p "$D" assets/app.js | grep -q "REST_COUNTDOWN_GIF"
+      - name: Upload build and signing tools BEFORE emulator
+        uses: actions/upload-artifact@v4
+        with:
+          name: SviatFit-198-Unsigned-Release-Debug-and-Tools
+          path: |
+            buildsrc/app/build/outputs/apk/release/app-release-unsigned.apk
+            buildsrc/app/build/outputs/apk/debug/app-debug.apk
+            /usr/local/lib/android/sdk/build-tools/35.0.0/lib/apksigner.jar
+            /usr/local/lib/android/sdk/build-tools/35.0.0/zipalign
+          if-no-files-found: error
+      - name: Emulator install, launch and background timer test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7
+          emulator-boot-timeout: 600
+          disable-animations: true
+          script: |
+            set -eu
+            APK="$GITHUB_WORKSPACE/buildsrc/app/build/outputs/apk/debug/app-debug.apk"
+            adb install -r "$APK" | tee /tmp/sviatfit-install.txt
+            adb shell pm grant com.sviat.fit.stable android.permission.POST_NOTIFICATIONS || true
+            adb shell am start -W -n com.sviat.fit.stable/com.sviat.fitnext.MainActivity | tee /tmp/sviatfit-start.txt
+            sleep 6
+            adb shell pidof com.sviat.fit.stable | tee /tmp/sviatfit-pid.txt
+            adb exec-out screencap -p > /tmp/sviatfit-main.png
+            adb logcat -c
+            END=$(( $(date +%s%3N) + 13000 ))
+            adb shell am start-foreground-service -n com.sviat.fit.stable/com.sviat.fitnext.RestTimerService -a com.sviat.fit.rest.START --el endAt "$END" --ez sound true --ez vibration false | tee /tmp/sviatfit-timer-start.txt
+            adb shell input keyevent KEYCODE_POWER
+            sleep 9
+            adb exec-out screencap -p > /tmp/sviatfit-locked.png
+            sleep 6
+            adb shell input keyevent KEYCODE_POWER || true
+            adb exec-out screencap -p > /tmp/sviatfit-after.png
+            adb logcat -d -v threadtime > /tmp/sviatfit-logcat.txt
+            if grep -E 'FATAL EXCEPTION|Process: com.sviat.fit.stable' /tmp/sviatfit-logcat.txt; then exit 1; fi
+      - name: Upload test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SviatFit-198-Android-Emulator-QA
+          path: |
+            /tmp/sviatfit-*.txt
+            /tmp/sviatfit-*.png
+          if-no-files-found: warn
