@@ -1,0 +1,39 @@
+name: Publish signed SviatFit UI 200 German voice countdown (NO APK)
+on:
+  push:
+    branches: [sviatfit-update-foundation]
+    paths:
+      - 'v200/parts/**'
+      - '.github/workflows/publish-ui-200.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore signed UI archive
+        shell: bash
+        run: |
+          cat v200/parts/part*.txt | base64 -d > /tmp/sviatfit-ui-200.zip
+          echo 'e8bb899ecb5878c29907b9d7f4ca5d51c6daf0aa082c7e038bd221426a819fab  /tmp/sviatfit-ui-200.zip' | sha256sum -c -
+          unzip -t /tmp/sviatfit-ui-200.zip | tail -2
+          test "$(unzip -Z1 /tmp/sviatfit-ui-200.zip | wc -l)" -eq 11
+          unzip -p /tmp/sviatfit-ui-200.zip app.js | grep -q 'REST_GERMAN_VOICE_MP3'
+          unzip -p /tmp/sviatfit-ui-200.zip app.js | grep -q 'prepareCountdownVoice'
+          unzip -p /tmp/sviatfit-ui-200.zip index.html | grep -q 'UI 200'
+          test "$(unzip -p /tmp/sviatfit-ui-200.zip app.js | wc -c)" -gt 150000
+          if unzip -Z1 /tmp/sviatfit-ui-200.zip | grep -E '\.(apk|dex|jar|so|pem|p12|keystore)$'; then echo 'Forbidden binary or secret'; exit 1; fi
+      - name: Publish UI-only ZIP to GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if gh release view ui-200 >/dev/null 2>&1; then
+            gh release upload ui-200 /tmp/sviatfit-ui-200.zip --clobber
+          else
+            gh release create ui-200 /tmp/sviatfit-ui-200.zip --target sviatfit-update-foundation --title 'SviatFit UI 200: German voice 5 4 3 2 1 LOS!' --notes 'No APK. German synthetic voice embedded inside the signed JS UI. Synchronized with six fire GIF frames in foreground, settings toggle and preview. Locked-screen speech still requires a separate native Android build.'
+          fi
+          gh release view ui-200 --json assets --jq '.assets[].name' | grep -Fx 'sviatfit-ui-200.zip'
