@@ -1,0 +1,35 @@
+name: Publish SviatFit UI-only 1.9.6 (no APK)
+on:
+  push:
+    branches: [sviatfit-update-foundation]
+    paths:
+      - 'v196/sviatfit-ui-196.zip.b64'
+      - '.github/workflows/publish-ui-196.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore signed UI-only archive
+        shell: bash
+        run: |
+          base64 -d v196/sviatfit-ui-196.zip.b64 > /tmp/sviatfit-ui-196.zip
+          echo '0cdba25f22023f39ae409376670eda1ad66811eecdb3c12e45c4e265cd58c8e1  /tmp/sviatfit-ui-196.zip' | sha256sum -c -
+          unzip -t /tmp/sviatfit-ui-196.zip | tail -2
+          test "$(unzip -Z1 /tmp/sviatfit-ui-196.zip | wc -l)" = '10'
+          if unzip -Z1 /tmp/sviatfit-ui-196.zip | grep -E '\.(apk|dex|jar|so)$'; then echo 'Unexpected Android binary'; exit 1; fi
+      - name: Publish GitHub Release asset (no APK)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if gh release view ui-196 >/dev/null 2>&1; then
+            gh release upload ui-196 /tmp/sviatfit-ui-196.zip --clobber
+          else
+            gh release create ui-196 /tmp/sviatfit-ui-196.zip --target sviatfit-update-foundation --title 'SviatFit UI 196: countdown 5-4-3-2-1 LOS' --notes 'UI-only OTA: exact user GIF frames, completion animation and foreground finish tone. No Android APK or private user data.'
+          fi
+          gh release view ui-196 --json assets --jq '.assets[].name' | grep -Fx 'sviatfit-ui-196.zip'
