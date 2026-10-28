@@ -1,0 +1,33 @@
+name: Publish SviatFit UI-only 197 sound fix (no APK)
+on:
+  push:
+    branches: [sviatfit-update-foundation]
+    paths:
+      - 'v197/sviatfit-ui-197.zip.b64'
+      - '.github/workflows/publish-ui-197.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore signed UI archive and verify
+        run: |
+          base64 -d v197/sviatfit-ui-197.zip.b64 > /tmp/sviatfit-ui-197.zip
+          echo 'cec0cf50cb71e423b6cb81fca433d070084c8fb35d007a3e2e3cea2e80fad54a  /tmp/sviatfit-ui-197.zip' | sha256sum -c -
+          unzip -t /tmp/sviatfit-ui-197.zip | tail -2
+          test "$(unzip -Z1 /tmp/sviatfit-ui-197.zip | wc -l)" = '10'
+          if unzip -Z1 /tmp/sviatfit-ui-197.zip | grep -E '\.(apk|dex|jar|so)$'; then exit 1; fi
+      - name: Publish OTA ZIP to release (not Android APK)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view ui-197 >/dev/null 2>&1; then
+            gh release upload ui-197 /tmp/sviatfit-ui-197.zip --clobber
+          else
+            gh release create ui-197 /tmp/sviatfit-ui-197.zip --target sviatfit-update-foundation --title 'SviatFit UI 197: Rest finish sound' --notes 'UI-only OTA: uses the existing native playTimerSound bridge on the final rest tick while the app is visible; no new Android APK. Full-screen lockscreen GIF remains unsupported by installed native code.'
+          fi
+          gh release view ui-197 --json assets --jq '.assets[].name' | grep -Fx 'sviatfit-ui-197.zip'
