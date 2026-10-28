@@ -1,4 +1,4 @@
-name: SviatFit stable update SOURCE compile (no APK)
+name: SviatFit 1.9.5 APK build and verify
 on:
   push:
     branches: [sviatfit-update-foundation]
@@ -33,6 +33,17 @@ jobs:
         run: |
           test -f "$ANDROID_HOME/platforms/android-35/android.jar"
           test -d "$ANDROID_HOME/build-tools/35.0.0"
-      - name: Compile Android Java only (NO APK)
+      - name: Build APK
         working-directory: buildsrc
-        run: gradle :app:compileDebugJavaWithJavac --no-daemon --stacktrace
+        run: gradle :app:assembleDebug --no-daemon --stacktrace
+      - name: Verify APK
+        run: |
+          APK=buildsrc/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep "com.sviat.fit.stable"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SviatFit-1.9.5-installable-debug-APK
+          path: buildsrc/app/build/outputs/apk/debug/app-debug.apk
+
