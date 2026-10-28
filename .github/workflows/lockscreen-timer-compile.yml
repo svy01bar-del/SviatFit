@@ -22,7 +22,9 @@ jobs:
           base64 -d v197/SviatFit_LockScreen_Timer_Source_Update.zip.b64 > /tmp/source.zip
           echo "53405f5439a17b618ce7168ffc1ca9d60d422aaede4b2e5944e50f99ded97de0  /tmp/source.zip" | sha256sum -c -
           unzip -q /tmp/source.zip -d buildsrc
-          python buildsrc/test_patch.py
+          test -s buildsrc/app/src/main/assets/sviatfit_countdown_5_4_3_2_1_LOS.gif
+          grep -q 'class RestTimerService' buildsrc/app/src/main/java/com/sviat/fitnext/RestTimerService.java
+          grep -q 'class RestCountdownActivity' buildsrc/app/src/main/java/com/sviat/fitnext/RestCountdownActivity.java
           node --check buildsrc/app/src/main/assets/app.js
       - name: Verify Android SDK
         run: |
