@@ -1,0 +1,45 @@
+name: Publish SviatFit UI 202 training corrections (no APK)
+on:
+  push:
+    branches: [sviatfit-update-foundation]
+    paths:
+      - 'v202/parts/**'
+      - '.github/workflows/publish-ui-202.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore already-signed UI 202 ZIP
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64
+          parts=sorted(Path('v202/parts').glob('chunk*.txt'))
+          assert len(parts)==17, len(parts)
+          encoded=''.join(p.read_text().strip()[::-1] for p in parts)
+          Path('/tmp/sviatfit-ui-202.zip').write_bytes(base64.b64decode(encoded,validate=True))
+          PY
+          echo '7534fa817815b117922fca3a0e0cfba177db10b19c2573afdbac1202b0850f96  /tmp/sviatfit-ui-202.zip' | sha256sum -c -
+          unzip -t /tmp/sviatfit-ui-202.zip | tail -2
+          test "$(unzip -Z1 /tmp/sviatfit-ui-202.zip | wc -l)" -eq 11
+          unzip -p /tmp/sviatfit-ui-202.zip native-model.js | grep -q 'UI 202: training plan'
+          unzip -p /tmp/sviatfit-ui-202.zip app.js | grep -q 'Свідомо завершити з пропусками'
+          unzip -p /tmp/sviatfit-ui-202.zip app.js | grep -q 'REST_GERMAN_VOICE_MP3'
+          if unzip -Z1 /tmp/sviatfit-ui-202.zip | grep -E '\.(apk|dex|jar|so|pem|p12|keystore)$'; then echo 'Secret or binary prohibited'; exit 1; fi
+      - name: Publish update
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view ui-202 >/dev/null 2>&1; then
+            gh release upload ui-202 /tmp/sviatfit-ui-202.zip --clobber
+          else
+            gh release create ui-202 /tmp/sviatfit-ui-202.zip --target sviatfit-update-foundation --title 'SviatFit UI 202: Full Body A/B training update' --notes 'Signed UI-only update: sensible A/B set counts; physical weight increments; prevent unsafe autoprogression with RIR zero; incomplete workout confirmation; preserve all workout history and existing drafts. Includes Fire Ring and German countdown from UI201. No APK.'
+          fi
+          gh release view ui-202 --json assets --jq '.assets[].name' | grep -Fx 'sviatfit-ui-202.zip'
